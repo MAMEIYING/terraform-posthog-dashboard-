@@ -1,6 +1,7 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
 # Local variable files may contain API keys and must never be committed.
 *.tfvars
 *.auto.tfvars

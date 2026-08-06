@@ -1,7 +1,5 @@
+# Shared PostHog connection settings used by every dashboard root.
+# Copy this file to terraform.tfvars and replace the placeholder with a Personal API Key.
 posthog_project_id = "92499"
 posthog_api_key    = "phx_replace_with_your_personal_api_key"
 posthog_host       = "https://us.posthog.com"
-dashboard_name     = "intake error"
-dashboard_tags     = ["error-tracking", "intake"]
-intake_path        = "/intake"
-tenant_property    = "tenant_id"

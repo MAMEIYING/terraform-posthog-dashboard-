@@ -43,9 +43,9 @@ Terraform 在每个 Insight 内固定了最近一天和 `/intake` 条件；趋�
 
 相关实现：
 
-- 通用时间和路径条件：[main.tf](./main.tf#L1)
-- Dashboard 资源：[main.tf](./main.tf#L15)
-- Dashboard 布局：[main.tf](./main.tf#L463)
+- 通用时间和路径条件：[main.tf](../dashboards/intake-error/main.tf#L1)
+- Dashboard 资源：[main.tf](../dashboards/intake-error/main.tf#L15)
+- Dashboard 布局：[main.tf](../dashboards/intake-error/main.tf#L463)
 
 ## 3. 面板总览
 
@@ -73,7 +73,7 @@ WHERE $pathname = '/intake'
 - 作用：快速判断当前错误事件规模。
 - 注意：同一会话重复触发同一错误会重复计数。因此它反映错误产生次数，不等于受影响会话数或用户数。
 
-实现位置：[main.tf](./main.tf#L22)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L22)
 
 ### 3.2 Frontend error rate
 
@@ -123,7 +123,7 @@ Frontend error rate = A / B × 100
 - 前提：`$exception` 和 `$pageview` 必须具有一致且有效的 `$session_id`、`$pathname` 等属性。
 - 边界：当前是两个独立唯一会话集合相除，并未显式计算“错误会话与 Intake pageview 会话的交集”。正常采集下两者应基本一致，但采集缺失时可能出现异常比例。
 
-实现位置：[main.tf](./main.tf#L53)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L53)
 
 ### 3.3 Frontend error trend
 
@@ -138,7 +138,7 @@ WHERE $pathname = '/intake'
 - 作用：识别错误突增、持续时间和可能的发布回归时间点。
 - 注意：错误循环可能使某个小时的数量显著放大；需要与错误率趋势结合判断影响范围。
 
-实现位置：[main.tf](./main.tf#L98)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L98)
 
 ### 3.4 Frontend error rate trend
 
@@ -171,7 +171,7 @@ WHERE $pathname = '/intake'
 
 推荐在确认是否允许改变大数字卡片形态后再实施，避免为满足 Hover 而破坏当前 Dashboard 的快速总览体验。
 
-实现位置：[main.tf](./main.tf#L248)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L248)
 
 ### 3.5 Top error issues
 
@@ -187,7 +187,7 @@ WHERE $pathname = '/intake'
 - 作用：识别贡献最大或正在增长的 PostHog Error Tracking Issue。
 - 注意：当前面板更擅长观察 Issue 趋势，不是严格的数量排行榜；图例只显示 Issue ID，可读性有限。
 
-实现位置：[main.tf](./main.tf#L295)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L295)
 
 ### 3.6 Unhandled error trend
 
@@ -203,7 +203,7 @@ WHERE $pathname = '/intake'
 - 作用：重点发现没有被应用捕获或处理的异常，这类错误通常具有更高排障优先级。
 - 注意：当前显示绝对数量，无法直接判断未处理错误占全部错误的比例。
 
-实现位置：[main.tf](./main.tf#L334)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L334)
 
 ### 3.7 Errors by type
 
@@ -219,7 +219,7 @@ WHERE $pathname = '/intake'
 - 作用：区分 `Error`、`TypeError` 等异常类型及其变化趋势。
 - 注意：`$exception_types` 是数组属性，标签可能不如 `$exception_issue_id` 稳定，不能替代 Issue 维度。
 
-实现位置：[main.tf](./main.tf#L131)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L131)
 
 ### 3.8 Errors by domain
 
@@ -235,7 +235,7 @@ WHERE $pathname = '/intake'
 - 作用：识别错误发生在哪些生产、测试或本地域名。
 - 重要限制：当前没有环境过滤，`localhost` 开发错误也会进入统计。
 
-实现位置：[main.tf](./main.tf#L170)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L170)
 
 ### 3.9 Errors by tenant
 
@@ -251,7 +251,7 @@ WHERE $pathname = '/intake'
 - 作用：判断错误是否集中影响某个或一组租户。
 - 注意：错误事件数高的租户也可能只是访问量更大。评估租户影响时，应结合“租户错误率”或租户 Intake 会话量。
 
-实现位置：[main.tf](./main.tf#L209)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L209)
 
 ### 3.10 Errors by browser
 
@@ -267,7 +267,7 @@ WHERE $pathname = '/intake'
 - 作用：发现浏览器兼容性问题。
 - 注意：当前只按浏览器名称拆分，没有进一步区分浏览器版本、操作系统或设备类型。
 
-实现位置：[main.tf](./main.tf#L375)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L375)
 
 ### 3.11 Frontend error list
 
@@ -311,7 +311,7 @@ WHERE $pathname = '/intake'
 - `url` 可能包含 `productId` 等查询参数，需要限制数据访问权限。
 - `has_recording` 只表示 Replay 是否存在，当前没有生成直接 Replay 跳转链接。
 
-实现位置：[main.tf](./main.tf#L414)
+实现位置：[main.tf](../dashboards/intake-error/main.tf#L414)
 
 ## 4. Dashboard 筛选规则
 
@@ -454,6 +454,8 @@ resolved: false
 ## 9. Terraform 管理边界
 
 - Dashboard、11 个 Insight 和完整布局由 Terraform 管理。
+- 该 Dashboard 使用 `dashboards/intake-error` 独立根模块和独立 State；其他 Dashboard 的命令不会修改这些资源。
+- 从项目根目录使用 `make plan-intake-error` 和 `make apply-intake-error`，不要直接在根目录执行 `terraform apply`。
 - `posthog_dashboard_layout` 会完整接管 Dashboard 图块。
 - 不要仅在 PostHog UI 添加需要长期保留的图块；下一次 Terraform Apply 可能覆盖布局。
 - 当前顶部默认时间、粒度和 Path 筛选保存在 PostHog UI 中，因为当前 Provider 不管理 Dashboard 级筛选字段。
