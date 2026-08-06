@@ -11,7 +11,9 @@ terraform-posthog-dashboard/
 ├── terraform.tfvars.example         # 共享参数示例
 ├── dashboards/
 │   ├── README.md                     # 新增 Dashboard 说明
-│   └── intake-error/                 # 独立 Terraform 根模块和 State
+│   ├── intake-error/                 # Intake Error 独立根模块和 State
+│   │   └── ...
+│   └── intake-performance/           # Intake Performance 独立根模块和 State
 │       ├── dashboard.tfvars.json     # 可提交的 Dashboard 业务配置
 │       ├── main.tf
 │       ├── outputs.tf
@@ -19,7 +21,8 @@ terraform-posthog-dashboard/
 │       ├── variables.tf
 │       └── versions.tf
 └── docs/
-    └── intake-error.md               # Intake Error 指标与使用说明
+    ├── intake-error.md               # Intake Error 指标与使用说明
+    └── intake-performance.md         # Intake Performance 指标与使用说明
 ```
 
 ## 已支持的 Dashboard
@@ -27,8 +30,9 @@ terraform-posthog-dashboard/
 | 命令名称 | PostHog Dashboard | 说明文档 |
 | --- | --- | --- |
 | `intake-error` | `intake error` | [指标与使用说明](./docs/intake-error.md) |
+| `intake-performance` | `intake performance` | [指标与使用说明](./docs/intake-performance.md) |
 
-## Dashboard 内容
+## Intake Error Dashboard 内容
 
 所有指标默认查询最近 1 天，并且只统计 `$pathname` **精确等于** `/intake` 的数据。趋势图统一按小时聚合。
 
@@ -116,6 +120,17 @@ make fmt-check-intake-error
 make validate-intake-error
 make plan-intake-error
 make apply-intake-error
+```
+
+`intake-performance` 对应已有的 PostHog Dashboard，首次使用必须先导入现有 Dashboard、13 个 Insight 和 Layout，不能直接 `apply`。完整 ID 映射和命令见 [Intake Performance 指标与使用说明](./docs/intake-performance.md#6-导入既有资源)。导入完成后的日常工作流为：
+
+```bash
+make init-intake-performance
+make import-intake-performance
+make fmt-check-intake-performance
+make validate-intake-performance
+make plan-intake-performance
+make apply-intake-performance
 ```
 
 查看输出和 State：

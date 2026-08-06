@@ -1,5 +1,5 @@
 TERRAFORM ?= terraform
-DASHBOARDS := intake-error
+DASHBOARDS := intake-error intake-performance
 DASHBOARD ?= intake-error
 DASHBOARD_ALIASES := init format fmt-check validate plan apply destroy output state-list migrate
 
@@ -12,7 +12,7 @@ TF_VAR_ARGS := -var-file="$(COMMON_TFVARS)" -var-file="$(DASHBOARD_TFVARS)"
 
 .DEFAULT_GOAL := help
 
-.PHONY: help list check-dashboard check-tfvars init fmt fmt-check validate plan apply destroy output state-list migrate-state
+.PHONY: help list check-dashboard check-tfvars init fmt fmt-check validate plan apply destroy output state-list migrate-state import-intake-performance
 
 help:
 	@echo "Available dashboards: $(DASHBOARDS)"
@@ -28,6 +28,9 @@ help:
 	@echo "Generic commands:"
 	@echo "  make <command> DASHBOARD=<name>"
 	@echo "  Commands: init, fmt, fmt-check, validate, plan, apply, destroy, output, state-list, migrate-state"
+	@echo
+	@echo "Existing dashboard imports:"
+	@echo "  make import-intake-performance"
 
 list:
 	@printf '%s\n' $(DASHBOARDS)
@@ -70,6 +73,9 @@ state-list: check-dashboard
 
 migrate-state: check-dashboard
 	@sh scripts/migrate-local-state.sh "$(PROJECT_DIR)" "$(DASHBOARD)"
+
+import-intake-performance: check-tfvars
+	@sh scripts/import-intake-performance.sh "$(PROJECT_DIR)" "$(TERRAFORM)"
 
 init-%:
 	@$(MAKE) init DASHBOARD=$*
