@@ -1,70 +1,140 @@
-# Intake Performance Dashboard 指标与使用说明
+# Intake Performance Dashboards: Metrics and Usage
 
-> 同步日期：2026-08-06
+> English | [中文](./intake-performance.zh.md)
+
+> Last synchronized: 2026-08-06
 >
-> PostHog 项目：`92499`
+> PostHog project: `92499`
 >
-> Dashboard：[intake performance](https://us.posthog.com/project/92499/dashboard/1956103)
+> Overview: [Intake Performance Overview](https://us.posthog.com/project/92499/dashboard/1956103)
+>
+> Diagnostics: [Intake Performance Diagnostics](https://us.posthog.com/project/92499/dashboard/1961465)
 
-## 1. Dashboard 目标
+## 1. Dashboard goals
 
-该 Dashboard 用于观察 `/intake` 页面最近 24 小时的 Web Vitals 与访问量，包括 INP、LCP、FCP、CLS 的 P75/P90/P99、LCP 慢加载比例，以及 PV/UV 总量和上一周期对比趋势。
+The two dashboards provide complementary views of `/intake` performance:
 
-## 2. 全局范围
+- Overview monitors health over the latest 24 hours with Web Vitals P75 trends, poor ratios, metric coverage, and PV/UV.
+- Diagnostics supports investigation over the latest 7 days with P75/P90/P99 trends, Tenant/Organization/Domain breakdowns, and an event-level Web Vitals report list.
 
-| 配置 | 当前值 | 说明 |
+## 2. Global scope
+
+| Setting | Current value | Notes |
 | --- | --- | --- |
-| Dashboard 顶部时间范围 | 最近 24 小时 | PostHog 保存值为 `-24h`，Provider 当前不管理该字段 |
-| HogQL 与 PV/UV Insight | 最近 24 小时 | Insight 自身保存为 `-24h` |
-| Web Vitals Trends | 最近 1 小时 | Insight 自身保存为 `-1h`；在 Dashboard 内被顶部 `-24h` 覆盖 |
-| Dashboard 顶部趋势粒度 | `hour` | 慢 LCP 卡自身保存为 `minute`，在 Dashboard 内被顶部设置覆盖 |
-| 页面路径 | `/intake` | 除 Derived 面板外，统一使用 Web Analytics 的 cleaned path 口径 |
-| 对比 | 上一周期 | PV/UV 趋势启用对比 |
-| 测试账号过滤 | 未启用 | Trends 查询中 `filterTestAccounts = false` |
+| Overview | Latest 24 hours | P75 trends, Coverage, and PV/UV persist `-24h`; the four ratio cards persist `-1h`. The dashboard-level range overrides native Trends cards |
+| Diagnostics | Latest 7 days | Percentile trends, dimension tables, and the report list persist `-7d` |
+| Trend interval | Overview follows the top-level selection | P75 trends persist `hour` but accept the dashboard `grouped by` override; Diagnostics persists `hour` |
+| Page path | `/intake` | All panels except the Derived panel use the Web Analytics cleaned-path definition |
+| Comparison | Previous period | PV/UV trends enable period comparison |
+| Test-account filtering | Disabled | Trends queries set `filterTestAccounts = false` |
 
-## 3. 面板清单
+## 3. Overview panels
 
-| 顺序 | 面板 | 统计口径 | 布局 |
+| Order | Panel | Definition | Layout |
 | ---: | --- | --- | --- |
-| 1 | Derived - Intake LCP slow-load ratio | LCP 大于 4000 ms 的 `$web_vitals` 数量 ÷ 有 LCP 值的数量 × 100，以 `%` 后缀展示 | 12 列大数字卡 |
-| 2–5 | INP/LCP/FCP/CLS P75 | 按小时计算 P75；INP/LCP/FCP 取最后一个非零桶，CLS 在区间内有非零数据时取最后一个桶 | 4 个等宽大数字卡 |
-| 6–9 | INP/LCP/FCP/CLS P75/P90/P99 | 按小时展示三个百分位趋势 | 2 × 2 趋势图 |
-| 10–11 | PV/UV total | 仅统计有效 session；PV 使用 `count()`，UV 使用 `uniq(person_id)` | 2 个等宽大数字卡 |
-| 12–13 | PV/UV trend | 按小时展示当前周期与上一周期 | 2 个等宽趋势图 |
+| 1–4 | Derived LCP slow-load ratio, plus INP/FCP/CLS poor ratio | Events above the Poor threshold divided by events where the metric is set; thresholds are LCP 4000 ms, INP 500 ms, FCP 3000 ms, and CLS 0.25. LCP retains the legacy Derived exact-path query; the other three use the Web Analytics cleaned-path definition | Four equal-width bold-number cards |
+| 5–8 | INP/LCP/FCP/CLS P75 trend | Uses the same native Trends P75 series as Web Analytics; both the date range and interval accept dashboard-level overrides | 2 × 2 trend charts |
+| 9 | Web Vitals coverage | Shows measured pageviews, total pageviews, and coverage for each metric | Full-width table |
+| 10–11 | PV/UV total | Counts only valid sessions no later than the current time; PV uses `count()` and UV uses `uniq(person_id)` | Two equal-width bold-number cards |
+| 12–13 | PV/UV trend | Shows the current and previous periods using the dashboard-level interval | Two equal-width trend charts |
 
-## 4. Web Analytics 对齐口径
+Overview retains four native P75 trend charts so changing the date range or `grouped by` selection cannot leave the display pinned to the same final hourly bucket. The eight former P90/P99 single-value insights and the status matrix remain managed by Terraform but are detached from Overview for rollback.
 
-除 `Derived - Intake LCP slow-load ratio` 外，所有面板都以 PostHog Web Analytics 模块为数据标准：
+## 4. Diagnostics panels
 
-- Web Vitals 使用 `$web_vitals` 事件、Web Analytics cleaned path 和对应数值属性的 P75/P90/P99。
-- P75 数字卡复刻 Web Vitals 顶部指标的取值逻辑：INP/LCP/FCP 回退到最后一个非零桶；CLS 在区间内出现过非零值后展示最后一个桶。
-- PV/UV total 只统计 PostHog 已解析出 `$session_id_uuid` 的 `$pageview`；PV 统计事件数，UV 按 `person_id` 使用 PostHog Web Overview 同口径的 `uniq` 聚合。
-- PV/UV trend 使用 Web Analytics 原生 Trends 查询结构、cleaned path、当前周期与上一周期对比。
+| Order | Panel | Definition | Layout |
+| ---: | --- | --- | --- |
+| 1–4 | INP/LCP/FCP/CLS P75/P90/P99 | Shows three percentile trends by hour for the latest 7 days | 2 × 2 trend charts |
+| 5 | Diagnostics filters | Explains how to use Dashboard Filter with `tenant_id`, `org_id`, and `$host` | Text panel |
+| 6 | Dimension coverage | Shows Tenant, Org, and Domain coverage and distinct-value counts after deduplicating by `$pageview_id` | Full-width table |
+| 7–9 | Tenant/Organization/Domain performance | Shows valid pageviews, samples, P75, and poor ratio for four metrics per dimension; missing values remain in `(missing)` | Three full-width tables |
+| 10 | Web Vitals reports | Keeps one row per `$web_vitals` report and shows key performance, business, experiment, page, device, and session attributes in descending timestamp order | Full-width table |
 
-## 5. Terraform 管理范围
+The dimension tables aggregate by `$pageview_id`. When a pageview reports the same metric more than once, the latest valid value is used so duplicate events do not distort dimension rankings.
 
-`dashboards/intake-performance` 管理以下既有 PostHog 资源：
+The Web Vitals report list does not deduplicate pageviews or hard-code a HogQL `LIMIT`. PostHog returns the first 100 rows by default; when more data exists, the response contains `hasMore = true` and the table can fetch subsequent rows through “Load more.” Its columns are Reported at, LCP, INP, FCP, CLS, Tenant, Organization, Program, Intake type, Experiment variant, Intake version, Host, Pathname, Current URL, Device, Browser, OS, Session ID, and Pageview ID. It inherits the Diagnostics date range, `/intake` cleaned-path condition, and Dashboard Filter.
 
-- Dashboard `1956103` 的名称、描述、Pinned 状态和标签。
-- 13 个 Insight 的名称、描述、标签、查询与展示配置。
-- 13 个图块的顺序、尺寸和位置。
+## 5. Data quality and query semantics
 
-PostHog Provider `1.0.x` 当前不暴露 Dashboard 的文件夹和顶部全局筛选字段，因此 Terraform 不管理 `Unfiled/Dashboards` 文件夹、Dashboard 顶部保存的 `-24h` 时间范围和 `hour` 粒度。Terraform 会精确保留各 Insight 自身保存的查询值；当前 Dashboard 中 Web Vitals 的 24 小时/小时展示仍依赖顶部筛选，请不要在 PostHog UI 中清除或改写这些顶部默认值。
+Event audit results from 2026-08-06:
 
-`posthog_dashboard_layout` 会完整接管 Dashboard 中的所有图块。不要在 PostHog UI 中手动添加需要长期保留、但未写入 Terraform 的图块。
+| Event sample | Tenant coverage | Org coverage | Domain coverage | Notes |
+| --- | ---: | ---: | ---: | --- |
+| 63 `$pageview` events | 1/63 | 1/63 | 63/63 | Tenant/Org are not registered reliably before automatic pageviews |
+| 20 sampled `$web_vitals` events | 1/20 | 1/20 | 20/20 | The small sample is affected by API result ordering and only demonstrates missing properties |
+| Diagnostics, 7 days, 245 deduplicated pageviews | 245/245 | 200/245 | 245/245 | Actual dashboard aggregation; missing Org values remain in `(missing)` |
 
-## 6. 导入既有资源
+Tenant/Org filters are currently suitable for Web Vitals diagnostics but should not be used to explain overall PV/UV. To make top-level Tenant/Org filters cover traffic metrics, the frontend must register `tenant_id` and `org_id` before `$pageview` is generated, or emit a pageview containing both properties.
 
-该目录对应已有 Dashboard，首次在一个新的本地环境中使用时必须先导入，禁止直接 `apply`，否则 Terraform 会尝试创建副本。
+Coverage is computed independently for each metric because a `$web_vitals` event may contain only a subset of metrics. Missing metrics must not be interpreted as zero.
+
+## 6. Web Analytics alignment
+
+Except for `Derived - Intake LCP slow-load ratio`, all panels use PostHog Web Analytics as the source of truth:
+
+- Web Vitals use `$web_vitals`, the Web Analytics cleaned path, and the corresponding numeric properties for P75/P90/P99.
+- Overview P75 uses native TrendsQuery series with the same `$web_vitals` P75 definitions as Web Analytics and accepts dashboard-level date-range and interval overrides.
+- PV/UV totals include only `$pageview` events where PostHog resolved `$session_id_uuid`; PV counts events and UV uses the Web Overview-compatible `uniq(person_id)` aggregation.
+- PV/UV trends use the native Web Analytics Trends query shape, cleaned path, and current-versus-previous-period comparison.
+
+Dashboard-level property filters are managed in the PostHog UI because the provider cannot declare them. Use Filter with `tenant_id`, `org_id`, or `$host`; all HogQL tables accept those conditions through `{filters}`.
+
+## 7. Terraform management scope
+
+`dashboards/intake-performance` manages:
+
+- Overview Dashboard `1956103` and Diagnostics Dashboard `1961465`.
+- Names, descriptions, tags, queries, and visualization settings for 31 insights.
+- 13 Overview insight tiles, plus 9 Diagnostics insight tiles and one Diagnostics text tile.
+
+PostHog Provider `1.0.x` does not expose dashboard folders or top-level global filters. Terraform therefore does not manage the `Unfiled/Dashboards` folder, the saved `-24h` dashboard range, or the `hour` interval. Terraform preserves the values stored on each insight. The current 24-hour/hour Web Vitals view still depends on top-level dashboard filters, which should not be removed or overwritten in the PostHog UI.
+
+Both `posthog_dashboard_layout` resources fully own their dashboard tiles. Do not manually add tiles in PostHog that need to persist but are not declared in Terraform.
+
+PostHog Provider `1.0.x` cannot remove a corresponding tile by updating an existing insight's `dashboard_ids` to an empty collection, and the layout resource does not delete existing tiles that are omitted from its declaration. The eight standalone P90/P99 Overview insights and the former status matrix therefore ignore that field through Lifecycle. After the layout update, `terraform_data.intake_performance_overview_percentile_tile_cleanup` calls PostHog's official `delete_tile` action to soft-delete only their dashboard tiles. The insights remain managed and available for rollback; repeated runs make no changes when no matching tile exists.
+
+The cleanup provisioner runs locally and requires a POSIX-compatible shell, `curl`, and `jq`. The configured Personal API Key must be able to read the Overview dashboard and call its `delete_tile` action. If a dependency is missing or the API request fails, `terraform apply` fails instead of silently leaving obsolete tiles behind.
+
+### 7.1 Business configuration
+
+The committed `dashboard.tfvars.json` provides these module-specific values:
+
+| Variable | Current value | Purpose |
+| --- | --- | --- |
+| `dashboard_name` | `Intake Performance Overview` | Overview dashboard name |
+| `diagnostics_dashboard_name` | `Intake Performance Diagnostics` | Diagnostics dashboard name |
+| `dashboard_description` | Empty | Optional Overview description |
+| `dashboard_pinned` | `false` | Overview pinned state |
+| `dashboard_tags` | `[]` | Tags shared by both dashboards |
+| `date_from` | `-24h` | Overview HogQL, P75, Coverage, and PV/UV rolling range |
+| `web_vitals_trend_date_from` | `-1h` | Saved rolling range for the Overview ratio Trends cards before dashboard overrides |
+| `diagnostics_date_from` | `-7d` | Diagnostics rolling range |
+| `intake_path` | `/intake` | Cleaned-path target used by performance queries |
+
+Shared connection values remain in the ignored root `terraform.tfvars`: `posthog_host`, `posthog_project_id`, and the sensitive, ephemeral `posthog_api_key`.
+
+### 7.2 Outputs
+
+Run `make output-intake-performance` to inspect:
+
+| Output | Contents |
+| --- | --- |
+| `dashboard_id` / `dashboard_url` | Overview dashboard ID and URL |
+| `diagnostics_dashboard_id` / `diagnostics_dashboard_url` | Diagnostics dashboard ID and URL |
+| `insight_ids` | Combined key-to-ID map for all 31 managed insights |
+
+## 8. Importing existing resources
+
+This module corresponds to two existing dashboards. In a new local environment, import existing resources before applying so Terraform does not create duplicates.
 
 ```bash
 make init-intake-performance
 make import-intake-performance
 ```
 
-导入脚本会把 Dashboard、13 个 Insight 和 Dashboard Layout 导入到同一个独立 State；重复执行时会跳过已经纳管的资源。当前资源 ID 与 Terraform Key 的对应关系如下：
+The import script imports two dashboards, 31 existing insights, and two dashboard layouts into one isolated state. Re-running it skips resources already under management. Existing insight IDs are:
 
-| Terraform Key | PostHog Insight ID |
+| Terraform key | PostHog Insight ID |
 | --- | ---: |
 | `derived_intake_lcp_slow_load_ratio` | `10761331` |
 | `intake_inp_p75_web_analytics` | `10790939` |
@@ -79,11 +149,29 @@ make import-intake-performance
 | `intake_uv_total_web_analytics` | `10791894` |
 | `intake_pv_trend_web_analytics` | `10791526` |
 | `intake_uv_trend_web_analytics` | `10791435` |
+| `intake_poor_inp_ratio` | `10794623` |
+| `intake_poor_fcp_ratio` | `10794622` |
+| `intake_poor_cls_ratio` | `10794625` |
+| `intake_web_vitals_coverage` | `10794624` |
+| `intake_inp_p90_web_analytics` | `10794932` |
+| `intake_lcp_p90_web_analytics` | `10794927` |
+| `intake_fcp_p90_web_analytics` | `10794930` |
+| `intake_cls_p90_web_analytics` | `10794931` |
+| `intake_inp_p99_web_analytics` | `10794934` |
+| `intake_lcp_p99_web_analytics` | `10794928` |
+| `intake_fcp_p99_web_analytics` | `10794929` |
+| `intake_cls_p99_web_analytics` | `10794933` |
+| `intake_web_vitals_percentile_status` | `10795642` |
+| `intake_dimension_coverage` | `10794610` |
+| `intake_tenant_performance` | `10794612` |
+| `intake_org_performance` | `10794613` |
+| `intake_domain_performance` | `10794611` |
+| `intake_web_vitals_reports` | `10795956` |
 
-Layout 的导入 ID 与 Dashboard ID 相同：`1956103`。完成全部导入后执行：
+Layout import IDs match their dashboard IDs: `1956103` for Overview and `1961465` for Diagnostics. After all imports complete, run:
 
 ```bash
 make plan-intake-performance
 ```
 
-只有在 Plan 确认不会创建或删除 Dashboard/Insight，并且所有更新都经过审查后，才可以执行 `make apply-intake-performance`。
+After all resources are imported or deployed, the plan should report `No changes`. Future changes must not unexpectedly create or delete a dashboard or delete an existing insight. Run `make apply-intake-performance` only after reviewing every planned update.

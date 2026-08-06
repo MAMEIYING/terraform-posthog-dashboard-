@@ -14,6 +14,12 @@ locals {
     explicitDate = false
   }
 
+  diagnostics_date_range = {
+    date_from    = var.diagnostics_date_from
+    date_to      = null
+    explicitDate = false
+  }
+
   cleaned_path_filter = {
     key      = "$pathname"
     operator = "is_cleaned_path_exact"
@@ -23,119 +29,28 @@ locals {
 
   p75_metrics = {
     inp = {
-      name  = "Intake INP P75 (Web Analytics)"
-      query = <<-HOGQL
-        WITH filtered AS (
-            SELECT timestamp, toFloat(properties.$web_vitals_INP_value) AS metric
-            FROM events
-            WHERE event = '$web_vitals'
-              AND {filters}
-        ),
-        bucketed AS (
-            SELECT toStartOfHour(timestamp) AS bucket,
-                   quantile(0.75)(metric) AS value
-            FROM filtered
-            GROUP BY bucket
-        )
-        SELECT nullIf(argMaxIf(value, bucket, value != 0), 0) AS value
-        FROM bucketed
-      HOGQL
-      formatting = {
-        style         = "none"
-        prefix        = ""
-        suffix        = "ms"
-        decimalPlaces = 0
-      }
-      display = {
-        color         = "#1d4aff"
-        label         = ""
-        trendLine     = false
-        displayType   = "auto"
-        yAxisPosition = "left"
-      }
-      layout = { x = 0, y = 3, w = 3, h = 3 }
+      name        = "Intake INP P75 (Web Analytics)"
+      property    = "$web_vitals_INP_value"
+      axis_format = "duration_ms"
+      layout      = { x = 0, y = 3, w = 6, h = 5 }
     }
     lcp = {
-      name  = "Intake LCP P75 (Web Analytics)"
-      query = <<-HOGQL
-        WITH filtered AS (
-            SELECT
-                timestamp,
-                toFloat(properties.$web_vitals_LCP_value) / 1000.0 AS metric
-            FROM events
-            WHERE event = '$web_vitals'
-              AND {filters}
-        ),
-        bucketed AS (
-            SELECT
-                toStartOfHour(timestamp) AS bucket,
-                quantile(0.75)(metric) AS value
-            FROM filtered
-            GROUP BY bucket
-        )
-        SELECT round(nullIf(argMaxIf(value, bucket, value != 0), 0), 2) AS value
-        FROM bucketed
-      HOGQL
-      formatting = {
-        prefix = ""
-        suffix = "s"
-      }
-      display = null
-      layout  = { x = 3, y = 3, w = 3, h = 3 }
+      name        = "Intake LCP P75 (Web Analytics)"
+      property    = "$web_vitals_LCP_value"
+      axis_format = "duration_ms"
+      layout      = { x = 6, y = 3, w = 6, h = 5 }
     }
     fcp = {
-      name  = "Intake FCP P75 (Web Analytics)"
-      query = <<-HOGQL
-        WITH filtered AS (
-            SELECT timestamp, toFloat(properties.$web_vitals_FCP_value) AS metric
-            FROM events
-            WHERE event = '$web_vitals'
-              AND {filters}
-        ),
-        bucketed AS (
-            SELECT toStartOfHour(timestamp) AS bucket,
-                   quantile(0.75)(metric) AS value
-            FROM filtered
-            GROUP BY bucket
-        )
-        SELECT round(nullIf(argMaxIf(value, bucket, value != 0), 0), 0) AS value
-        FROM bucketed
-      HOGQL
-      formatting = {
-        prefix = ""
-        suffix = "ms"
-      }
-      display = null
-      layout  = { x = 6, y = 3, w = 3, h = 3 }
+      name        = "Intake FCP P75 (Web Analytics)"
+      property    = "$web_vitals_FCP_value"
+      axis_format = "duration_ms"
+      layout      = { x = 0, y = 8, w = 6, h = 5 }
     }
     cls = {
-      name  = "Intake CLS P75 (Web Analytics)"
-      query = <<-HOGQL
-        WITH filtered AS (
-            SELECT
-                timestamp,
-                toFloat(properties.$web_vitals_CLS_value) AS metric
-            FROM events
-            WHERE event = '$web_vitals'
-              AND {filters}
-        ),
-        bucketed AS (
-            SELECT
-                toStartOfHour(timestamp) AS bucket,
-                quantile(0.75)(metric) AS value
-            FROM filtered
-            GROUP BY bucket
-        )
-        SELECT round(if(countIf(value != 0) = 0, NULL, argMax(value, bucket)), 2) AS value
-        FROM bucketed
-      HOGQL
-      formatting = {
-        prefix        = ""
-        suffix        = ""
-        decimalPlaces = 2
-      }
-      display = null
-      layout  = { x = 9, y = 3, w = 3, h = 3 }
+      name        = "Intake CLS P75 (Web Analytics)"
+      property    = "$web_vitals_CLS_value"
+      axis_format = null
+      layout      = { x = 6, y = 8, w = 6, h = 5 }
     }
   }
 
@@ -170,12 +85,12 @@ locals {
     pv = {
       name        = "Intake PV total (Web Analytics)"
       aggregation = "count()"
-      layout      = { x = 0, y = 16, w = 6, h = 3 }
+      layout      = { x = 0, y = 17, w = 6, h = 3 }
     }
     uv = {
       name        = "Intake UV total (Web Analytics)"
       aggregation = "uniq(person_id)"
-      layout      = { x = 6, y = 16, w = 6, h = 3 }
+      layout      = { x = 6, y = 17, w = 6, h = 3 }
     }
   }
 
@@ -184,13 +99,13 @@ locals {
       name        = "Intake PV trend (Web Analytics)"
       custom_name = "Page views"
       math        = "total"
-      layout      = { x = 0, y = 19, w = 6, h = 5 }
+      layout      = { x = 0, y = 20, w = 6, h = 5 }
     }
     uv = {
       name        = "Intake UV trend (Web Analytics)"
       custom_name = "Unique visitors"
       math        = "dau"
-      layout      = { x = 6, y = 19, w = 6, h = 5 }
+      layout      = { x = 6, y = 20, w = 6, h = 5 }
     }
   }
 
@@ -201,38 +116,36 @@ locals {
       tags        = []
       layout      = metric.layout
       query = {
-        kind = "DataVisualizationNode"
+        kind = "InsightVizNode"
         source = {
-          kind = "HogQLQuery"
-          filters = {
-            dateRange          = local.default_date_range
-            filterTestAccounts = false
-            properties         = [local.cleaned_path_filter]
+          kind               = "TrendsQuery"
+          dateRange          = local.default_date_range
+          filterTestAccounts = false
+          interval           = "hour"
+          properties         = [local.cleaned_path_filter]
+          series = [
+            {
+              kind               = "EventsNode"
+              event              = "$web_vitals"
+              name               = "$web_vitals"
+              math               = "p75"
+              math_property      = metric.property
+              math_property_type = "numerical_event_properties"
+              custom_name        = "P75"
+            }
+          ]
+          tags = {
+            productKey = "web_analytics"
           }
-          query = trimspace(metric.query)
-        }
-        display = "BoldNumber"
-        chartSettings = {
-          yAxis = [
+          trendsFilter = merge(
             {
-              column = "value"
-              settings = merge(
-                { formatting = metric.formatting },
-                metric.display == null ? {} : { display = metric.display },
-              )
+              display    = "ActionsLineGraph"
+              showLegend = false
+            },
+            metric.axis_format == null ? {} : {
+              aggregationAxisFormat = metric.axis_format
             }
-          ]
-        }
-        tableSettings = {
-          columns = [
-            {
-              column = "value"
-              settings = merge(
-                { formatting = metric.formatting },
-                metric.display == null ? {} : { display = metric.display },
-              )
-            }
-          ]
+          )
         }
       }
     }
@@ -248,7 +161,7 @@ locals {
         kind = "InsightVizNode"
         source = {
           kind               = "TrendsQuery"
-          dateRange          = local.web_vitals_trend_date_range
+          dateRange          = local.diagnostics_date_range
           filterTestAccounts = false
           interval           = "hour"
           properties         = [local.cleaned_path_filter]
@@ -298,6 +211,7 @@ locals {
             FROM events
             WHERE event = '$pageview'
               AND events.$session_id_uuid IS NOT NULL
+              AND timestamp <= now()
               AND {filters}
           HOGQL
           )
@@ -378,7 +292,7 @@ locals {
         name        = "Derived - Intake LCP slow-load ratio"
         description = null
         tags        = []
-        layout      = { x = 0, y = 0, w = 12, h = 3 }
+        layout      = { x = 0, y = 0, w = 3, h = 3 }
         query = {
           kind = "InsightVizNode"
           source = {
@@ -454,21 +368,31 @@ locals {
     local.page_trend_insights,
   )
 
-  insight_order = [
+  overview_existing_insight_order = [
     "derived_intake_lcp_slow_load_ratio",
     "intake_inp_p75_web_analytics",
     "intake_lcp_p75_web_analytics",
     "intake_fcp_p75_web_analytics",
     "intake_cls_p75_web_analytics",
-    "intake_inp_p75_p90_p99",
-    "intake_lcp_p75_p90_p99",
-    "intake_fcp_p75_p90_p99",
-    "intake_cls_p75_p90_p99",
     "intake_pv_total_web_analytics",
     "intake_uv_total_web_analytics",
     "intake_pv_trend_web_analytics",
     "intake_uv_trend_web_analytics",
   ]
+
+  diagnostics_existing_insight_order = [
+    "intake_inp_p75_p90_p99",
+    "intake_lcp_p75_p90_p99",
+    "intake_fcp_p75_p90_p99",
+    "intake_cls_p75_p90_p99",
+  ]
+
+  diagnostics_existing_layouts = {
+    intake_inp_p75_p90_p99 = { x = 0, y = 0, w = 6, h = 5 }
+    intake_lcp_p75_p90_p99 = { x = 6, y = 0, w = 6, h = 5 }
+    intake_fcp_p75_p90_p99 = { x = 0, y = 5, w = 6, h = 5 }
+    intake_cls_p75_p90_p99 = { x = 6, y = 5, w = 6, h = 5 }
+  }
 
   tile_ids = {
     derived_intake_lcp_slow_load_ratio = 10483504
@@ -497,11 +421,15 @@ resource "posthog_dashboard" "intake_performance" {
 resource "posthog_insight" "intake_performance" {
   for_each = local.insights
 
-  name          = each.value.name
-  description   = each.value.description
-  query_json    = jsonencode(each.value.query)
-  tags          = length(each.value.tags) == 0 ? null : each.value.tags
-  dashboard_ids = [posthog_dashboard.intake_performance.id]
+  name        = each.value.name
+  description = each.value.description
+  query_json  = jsonencode(each.value.query)
+  tags        = length(each.value.tags) == 0 ? null : each.value.tags
+  dashboard_ids = contains(local.diagnostics_existing_insight_order, each.key) ? [
+    posthog_dashboard.intake_performance_diagnostics.id
+    ] : [
+    posthog_dashboard.intake_performance.id
+  ]
 
   depends_on = [posthog_dashboard.intake_performance]
 }
@@ -510,23 +438,40 @@ resource "posthog_insight" "intake_performance" {
 resource "posthog_dashboard_layout" "intake_performance" {
   dashboard_id = posthog_dashboard.intake_performance.id
 
-  tiles = [
-    for key in local.insight_order : {
-      insight_id = posthog_insight.intake_performance[key].id
-      layouts_json = jsonencode({
-        sm = merge(
-          local.insights[key].layout,
-          {
-            i      = tostring(local.tile_ids[key])
-            minH   = 2
-            minW   = 2
-            moved  = false
-            static = false
-          },
-        )
-      })
-    }
-  ]
+  tiles = concat(
+    [
+      for key in local.overview_existing_insight_order : {
+        insight_id = posthog_insight.intake_performance[key].id
+        layouts_json = jsonencode({
+          sm = merge(
+            local.insights[key].layout,
+            {
+              i      = tostring(local.tile_ids[key])
+              minH   = 2
+              minW   = 2
+              moved  = false
+              static = false
+            },
+          )
+        })
+      }
+    ],
+    [
+      for key in local.overview_quality_order : {
+        insight_id = posthog_insight.intake_performance_overview_quality[key].id
+        layouts_json = jsonencode({
+          sm = merge(
+            local.overview_quality_insights[key].layout,
+            { minH = 2, minW = 2 },
+          )
+        })
+      }
+    ],
+  )
 
-  depends_on = [posthog_insight.intake_performance]
+  depends_on = [
+    posthog_insight.intake_performance,
+    posthog_insight.intake_performance_overview_quality,
+    posthog_insight.intake_performance_overview_percentiles,
+  ]
 }
