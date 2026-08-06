@@ -32,9 +32,15 @@ variable "posthog_api_key" {
 }
 
 variable "dashboard_name" {
-  description = "Name of the PostHog dashboard."
+  description = "Name of the PostHog overview dashboard."
   type        = string
-  default     = "intake performance"
+  default     = "Intake Performance Overview"
+}
+
+variable "diagnostics_dashboard_name" {
+  description = "Name of the PostHog diagnostics dashboard."
+  type        = string
+  default     = "Intake Performance Diagnostics"
 }
 
 variable "dashboard_description" {
@@ -74,6 +80,17 @@ variable "web_vitals_trend_date_from" {
   validation {
     condition     = length(trimspace(var.web_vitals_trend_date_from)) > 0
     error_message = "web_vitals_trend_date_from must not be empty."
+  }
+}
+
+variable "diagnostics_date_from" {
+  description = "Default rolling date range used by diagnostics insights."
+  type        = string
+  default     = "-7d"
+
+  validation {
+    condition     = length(trimspace(var.diagnostics_date_from)) > 0
+    error_message = "diagnostics_date_from must not be empty."
   }
 }
 

@@ -1,75 +1,88 @@
 # PostHog Dashboards with Terraform
 
-这个项目使用 PostHog 官方 Terraform Provider 管理多个 Dashboard。每个 Dashboard 都是独立的 Terraform 根模块和独立 State，通过专属 Make 命令创建、更新或删除，不会影响其他 Dashboard。
+> English | [中文](./README.zh.md)
 
-## 项目结构
+This project uses the official PostHog Terraform Provider to manage multiple dashboards. Each dashboard is an independent Terraform root module with its own state and dedicated Make commands, so creating, updating, or deleting one dashboard does not affect the others.
+
+## Project structure
 
 ```text
 terraform-posthog-dashboard/
-├── Makefile                         # Dashboard 命令入口
-├── terraform.tfvars                 # 共享连接参数和 API Key，禁止提交
-├── terraform.tfvars.example         # 共享参数示例
+├── Makefile                         # Dashboard command entry point
+├── terraform.tfvars                 # Shared connection settings and API key; never commit
+├── terraform.tfvars.example         # Shared settings example
 ├── dashboards/
-│   ├── README.md                     # 新增 Dashboard 说明
-│   ├── intake-error/                 # Intake Error 独立根模块和 State
+│   ├── README.md                     # Guide for adding dashboards
+│   ├── README.zh.md                  # Chinese guide for adding dashboards
+│   ├── intake-error/                 # Independent Intake Error root module and state
 │   │   └── ...
-│   └── intake-performance/           # Intake Performance 独立根模块和 State
-│       ├── dashboard.tfvars.json     # 可提交的 Dashboard 业务配置
+│   └── intake-performance/           # Independent Intake Performance root module and state
+│       ├── dashboard.tfvars.json     # Committable dashboard business configuration
+│       ├── diagnostics.tf             # Diagnostics dashboard and investigation tables
 │       ├── main.tf
+│       ├── overview-percentiles.tf    # Managed rollback-only percentile cards and cleanup
+│       ├── overview-quality.tf        # Overview quality and coverage cards
 │       ├── outputs.tf
 │       ├── provider.tf
 │       ├── variables.tf
 │       └── versions.tf
-└── docs/
-    ├── intake-error.md               # Intake Error 指标与使用说明
-    └── intake-performance.md         # Intake Performance 指标与使用说明
+├── docs/
+│   ├── intake-error.md               # Intake Error metrics and usage guide
+│   ├── intake-error.zh.md            # Intake Error Chinese guide
+│   ├── intake-performance.md         # Intake Performance metrics and usage guide
+│   └── intake-performance.zh.md      # Intake Performance Chinese guide
+└── scripts/
+    ├── import-intake-performance.sh  # Idempotent import of existing PostHog resources
+    └── cleanup-posthog-dashboard-tiles.sh
+                                      # Removes obsolete Overview tiles during apply
 ```
 
-## 已支持的 Dashboard
+## Supported dashboards
 
-| 命令名称 | PostHog Dashboard | 说明文档 |
+| Command name | PostHog dashboard | Documentation |
 | --- | --- | --- |
-| `intake-error` | `intake error` | [指标与使用说明](./docs/intake-error.md) |
-| `intake-performance` | `intake performance` | [指标与使用说明](./docs/intake-performance.md) |
+| `intake-error` | `intake error` | [English](./docs/intake-error.md) / [Chinese](./docs/intake-error.zh.md) |
+| `intake-performance` | `Intake Performance Overview` and `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [Chinese](./docs/intake-performance.zh.md) |
 
-## Intake Error Dashboard 内容
+## Intake Error dashboard contents
 
-所有指标默认查询最近 1 天，并且只统计 `$pathname` **精确等于** `/intake` 的数据。趋势图统一按小时聚合。
+All metrics query the latest day by default and include only events whose `$pathname` is **exactly** `/intake`. Trend charts use hourly buckets.
 
-| 图块 | 定义 |
+| Tile | Definition |
 | --- | --- |
-| Frontend error count | `$exception` 事件总数 |
-| Frontend error rate | 发生 `$exception` 的唯一 Intake 会话数 ÷ 访问 Intake 的唯一 `$pageview` 会话数 × 100% |
-| Frontend error trend | 按小时统计错误数量 |
-| Frontend error rate trend | 按小时统计发生错误的 Intake 会话比例 |
-| Top error issues | 按 `$exception_issue_id` 拆分前 10 个错误问题趋势 |
-| Unhandled error trend | 按小时统计 `$exception_handled = false` 的错误数量 |
-| Errors by type | 按 `$exception_types` 拆分错误趋势 |
-| Errors by domain | 按 `$host` 拆分错误趋势 |
-| Errors by tenant | 按 `tenant_id` 拆分错误趋势 |
-| Errors by browser | 按 `$browser` 拆分前 10 个浏览器错误趋势 |
-| Frontend error list | 最近错误的时间、租户、Domain、异常级别、类型、消息、来源、URL、Issue ID、Session ID、浏览器、操作系统、设备、Replay 状态、Intake 表单版本和用户 ID |
+| Frontend error count | Total number of `$exception` events |
+| Frontend error rate | Unique Intake sessions with an `$exception` ÷ unique Intake `$pageview` sessions × 100% |
+| Frontend error trend | Hourly error count |
+| Frontend error rate trend | Hourly proportion of Intake sessions affected by errors |
+| Top error issues | Trends for the top 10 error issues split by `$exception_issue_id` |
+| Unhandled error trend | Hourly count where `$exception_handled = false` |
+| Errors by type | Error trends split by `$exception_types` |
+| Errors by domain | Error trends split by `$host` |
+| Errors by tenant | Error trends split by `tenant_id` |
+| Errors by browser | Error trends for the top 10 browsers split by `$browser` |
+| Frontend error list | Recent error time, tenant, domain, severity, type, message, source, URL, issue ID, session ID, browser, operating system, device, replay status, Intake form version, and user ID |
 
-### 错误率分母验证与展示限制
+### Error-rate denominator validation and display limitations
 
-`Frontend error rate` 的分母来自 `/intake` `$pageview` 事件的 `unique_session` 聚合，不是 Pageview 事件总数。2026-08-06 对最近 7 天数据的验证结果为：39 个 `$pageview` 事件、11 个 Pageview 唯一会话、0 个 `$exception` 事件、0 个 Exception 唯一会话，因此错误率为 `0 ÷ 11 = 0%`。这证明当前分母查询链路可用，但仍需持续监控 `$pageview` 的 `$session_id`、`$pathname`、`$host` 和 `tenant_id` 属性覆盖率。
+The denominator of `Frontend error rate` comes from the `unique_session` aggregation over `/intake` `$pageview` events, not the number of pageview events. Validation on 2026-08-06 over the latest seven days returned 39 `$pageview` events, 11 unique pageview sessions, 0 `$exception` events, and 0 unique exception sessions, resulting in `0 ÷ 11 = 0%`. This confirms that the current denominator query works, but the property coverage of `$session_id`, `$pathname`, `$host`, and `tenant_id` on `$pageview` must still be monitored continuously.
 
-PostHog 原生 Trends 的所有公式序列共用数值格式，无法在保持错误率百分比格式的同时，把分子和分母按整数正确显示在 Hover 中；`BoldNumber` 大数字卡片本身也没有 Hover 数据点。因此当前 Terraform 保留现有百分比展示，没有加入会导致单位错误的分子/分母序列。完整验证结论和后续方案见 [Intake Error 指标与使用说明](./docs/intake-error.md#32-frontend-error-rate)。
+All formula series in native PostHog Trends share one numeric format, so the numerator and denominator cannot be shown correctly as integers in the hover state while retaining percentage formatting for the error rate. A `BoldNumber` card also has no hoverable data point. The current Terraform configuration therefore retains the percentage visualization without adding numerator or denominator series that would display incorrect units. See the [Intake Error metrics and usage guide](./docs/intake-error.md#32-frontend-error-rate) for the complete validation results and follow-up options.
 
-趋势 Insight 保留 PostHog 的属性筛选入口，错误列表同时启用时间范围和属性筛选，可用于追加 `tenant_id`、`$host`、`$exception_types` 等条件。
+Trend insights retain PostHog property-filter controls. The error list supports both date-range and property filters, allowing conditions such as `tenant_id`, `$host`, and `$exception_types` to be added.
 
-> `posthog_dashboard_layout` 会完整接管 Dashboard 中的所有图块。不要在 PostHog UI 中手动添加需要长期保留、但未写入 Terraform 的图块。
+> `posthog_dashboard_layout` fully controls all tiles in the dashboard. Do not manually add tiles in the PostHog UI if they need to persist but are not declared in Terraform.
 
-## 前置条件
+## Prerequisites
 
-- Terraform 1.10 或更高版本
-- PostHog US Cloud 项目 `92499`
-- 具有目标项目权限的 PostHog Personal API Key
-- 前端事件需要包含 `$session_id`、`$pathname`、`$host`、`$device_type`、`$raw_user_agent`、`tenant_id`；异常事件还需要包含 `$exception_types` 和 `$exception_values`
+- Terraform 1.10 or later
+- A POSIX-compatible shell, `curl`, and `jq`; the Intake Performance cleanup step invokes them during `terraform apply`
+- PostHog US Cloud project `92499`
+- A PostHog Personal API Key with access to the target project
+- Frontend events containing `$session_id`, `$pathname`, `$host`, `$device_type`, `$raw_user_agent`, and `tenant_id`; exception events must also contain `$exception_types` and `$exception_values`
 
-## 1. 配置共享 PostHog 参数
+## 1. Configure shared PostHog settings
 
-根目录的 `terraform.tfvars` 只保存所有 Dashboard 共用的 PostHog 连接参数。该文件被 `.gitignore` 排除：
+The root `terraform.tfvars` stores only the PostHog connection settings shared by all dashboards. The file is excluded by `.gitignore`:
 
 ```hcl
 posthog_project_id = "92499"
@@ -77,21 +90,21 @@ posthog_api_key    = "phx_your_personal_api_key"
 posthog_host       = "https://us.posthog.com"
 ```
 
-Dashboard 名称、标签、路径等非敏感配置保存在对应目录的 `dashboard.tfvars.json` 中，不要放进共享 `terraform.tfvars`。
+Store non-sensitive settings such as dashboard names, tags, and paths in the corresponding `dashboard.tfvars.json`, not in the shared `terraform.tfvars`.
 
-`posthog_api_key` 被声明为 `sensitive` 和 `ephemeral`，Terraform 会隐藏命令输出中的值，并避免将变量值写入 Plan 和 State。
+`posthog_api_key` is declared as both `sensitive` and `ephemeral`. Terraform hides the value from command output and avoids persisting it in plans and state.
 
-如果 `terraform.tfvars` 不存在，可以从示例文件重新创建：
+If `terraform.tfvars` does not exist, recreate it from the example:
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-## 2. 使用 Dashboard 专属命令
+## 2. Use dashboard-specific commands
 
-### 从旧版单 Dashboard 目录升级
+### Upgrade from the legacy single-dashboard layout
 
-如果当前检出环境在项目根目录中已经存在 `terraform.tfstate`，拉取本次目录重构后，必须先迁移 State：
+If the current checkout already has a root-level `terraform.tfstate`, migrate the state after pulling the directory restructuring changes:
 
 ```bash
 make migrate-intake-error
@@ -99,20 +112,20 @@ make init-intake-error
 make plan-intake-error
 ```
 
-迁移命令具有以下保护：
+The migration command includes these safeguards:
 
-- 目标 State 已存在且根目录 State 不存在时，按“已迁移”安全退出。
-- 根目录和目标目录同时存在 State 时立即失败，不覆盖任何文件。
-- Terraform 正在持有 State Lock 时立即失败。
-- 同步迁移 `terraform.tfstate.backup`，但不会覆盖已有备份。
+- If the destination state exists and the root state does not, it exits successfully because migration is already complete.
+- If both the root and destination states exist, it fails immediately without overwriting either file.
+- If Terraform currently holds a state lock, it fails immediately.
+- It also migrates `terraform.tfstate.backup` without overwriting an existing backup.
 
-`plan` 必须显示 `No changes`，才能继续执行 `apply`。如果旧 Dashboard 存在但找不到旧 State，不要执行 `apply`；应先恢复 State、配置远程 Backend，或导入现有资源。
+The plan must report `No changes` before applying. If the legacy dashboard exists but its old state cannot be found, do not apply. Restore the state, configure a remote backend, or import the existing resources first.
 
-旧版根目录 `terraform.tfvars` 还可能包含 `dashboard_name`、`dashboard_tags`、`intake_path` 和 `tenant_property`。这些字段现在由 `dashboards/intake-error/dashboard.tfvars.json` 管理，应从根目录文件移除，只保留三个共享 PostHog 参数。
+The legacy root `terraform.tfvars` may also contain `dashboard_name`, `dashboard_tags`, `intake_path`, and `tenant_property`. These settings are now managed by `dashboards/intake-error/dashboard.tfvars.json`; remove them from the root file and retain only the three shared PostHog settings.
 
-### 日常命令
+### Daily commands
 
-`intake-error` 的完整工作流：
+The complete `intake-error` workflow is:
 
 ```bash
 make init-intake-error
@@ -122,56 +135,65 @@ make plan-intake-error
 make apply-intake-error
 ```
 
-`intake-performance` 对应已有的 PostHog Dashboard，首次使用必须先导入现有 Dashboard、13 个 Insight 和 Layout，不能直接 `apply`。完整 ID 映射和命令见 [Intake Performance 指标与使用说明](./docs/intake-performance.md#6-导入既有资源)。导入完成后的日常工作流为：
+`intake-performance` manages the existing Overview dashboard and the new Diagnostics dashboard, with 31 insights and two layouts. Import all existing resources before the first apply. The complete ID mapping and commands are documented in [Intake Performance metrics and usage](./docs/intake-performance.md#8-importing-existing-resources). Bootstrap a new local state with:
 
 ```bash
 make init-intake-performance
 make import-intake-performance
+```
+
+After importing, use this regular workflow:
+
+```bash
 make fmt-check-intake-performance
 make validate-intake-performance
 make plan-intake-performance
 make apply-intake-performance
 ```
 
-查看输出和 State：
+Inspect output and state with:
 
 ```bash
 make output-intake-error
 make state-list-intake-error
+make output-intake-performance
+make state-list-intake-performance
 ```
 
-删除时必须明确指定 Dashboard：
+For Intake Performance, `dashboard.tfvars.json` configures both dashboard names, the Overview and Diagnostics rolling ranges, tags, and the Intake path. `make output-intake-performance` returns the Overview ID/URL, Diagnostics ID/URL, and the complete Insight ID map. See the [Intake Performance management scope](./docs/intake-performance.md#7-terraform-management-scope) for the exact inputs, outputs, cleanup behavior, and provider limitations.
+
+Always specify the dashboard explicitly when destroying resources:
 
 ```bash
 make destroy-intake-error
 ```
 
-也可以使用通用命令，效果相同：
+The generic commands are equivalent:
 
 ```bash
 make plan DASHBOARD=intake-error
 make apply DASHBOARD=intake-error
 ```
 
-`make apply-intake-error` 只读取：
+`make apply-intake-error` reads only:
 
-- 根目录 `terraform.tfvars`：共享 PostHog 连接信息。
-- `dashboards/intake-error/dashboard.tfvars.json`：该 Dashboard 的业务配置。
-- `dashboards/intake-error/terraform.tfstate`：该 Dashboard 的独立本地 State。
+- Root `terraform.tfvars`: shared PostHog connection settings.
+- `dashboards/intake-error/dashboard.tfvars.json`: business configuration for this dashboard.
+- `dashboards/intake-error/terraform.tfstate`: independent local state for this dashboard.
 
-## 3. 新增 Dashboard
+## 3. Add a dashboard
 
-1. 创建 `dashboards/<dashboard-name>/` 独立根模块。
-2. 创建该 Dashboard 的 `dashboard.tfvars.json`。
-3. 在 `Makefile` 的 `DASHBOARDS` 中登记名称。
-4. 依次执行 `make init-<dashboard-name>`、`make plan-<dashboard-name>` 和 `make apply-<dashboard-name>`。
+1. Create an independent root module under `dashboards/<dashboard-name>/`.
+2. Create `dashboard.tfvars.json` for the dashboard.
+3. Register the name in `DASHBOARDS` in the root `Makefile`.
+4. Run `make init-<dashboard-name>`, `make plan-<dashboard-name>`, and `make apply-<dashboard-name>` in order.
 
-详细约束见 [dashboards/README.md](./dashboards/README.md)。不要通过 `-target` 在一个 State 中分别创建 Dashboard，也不要复制其他 Dashboard 的 State。
+See [dashboards/README.md](./dashboards/README.md) ([Chinese](./dashboards/README.zh.md)) for detailed constraints. Do not use `-target` to create dashboards separately in a shared state, and never copy another dashboard's state.
 
-## 安全说明
+## Security
 
-- 根目录 `terraform.tfvars`、Terraform State 和 Plan 文件已加入 `.gitignore`。
-- `dashboard.tfvars.json` 只能保存非敏感业务配置。
-- `terraform.tfvars.example` 只能保留占位值，不要写入真实 API Key。
-- Terraform State 可能包含资源信息；团队环境建议使用加密的远程 Backend。
-- 不要强制提交 Personal API Key、State 文件或包含敏感值的执行日志。
+- Root `terraform.tfvars`, Terraform state, and plan files are excluded by `.gitignore`.
+- `dashboard.tfvars.json` may contain only non-sensitive business configuration.
+- `terraform.tfvars.example` may contain placeholders only; never add a real API key.
+- Terraform state may contain resource information. Use an encrypted remote backend in team environments.
+- Never force-commit a Personal API Key, a state file, or execution logs containing sensitive values.

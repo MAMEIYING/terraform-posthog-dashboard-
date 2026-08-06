@@ -54,6 +54,7 @@ import_resource() {
 }
 
 import_resource 'posthog_dashboard.intake_performance' '1956103'
+import_resource 'posthog_dashboard.intake_performance_diagnostics' '1961465'
 import_resource 'posthog_insight.intake_performance["derived_intake_lcp_slow_load_ratio"]' '10761331'
 import_resource 'posthog_insight.intake_performance["intake_inp_p75_web_analytics"]' '10790939'
 import_resource 'posthog_insight.intake_performance["intake_lcp_p75_web_analytics"]' '10790992'
@@ -67,6 +68,25 @@ import_resource 'posthog_insight.intake_performance["intake_pv_total_web_analyti
 import_resource 'posthog_insight.intake_performance["intake_uv_total_web_analytics"]' '10791894'
 import_resource 'posthog_insight.intake_performance["intake_pv_trend_web_analytics"]' '10791526'
 import_resource 'posthog_insight.intake_performance["intake_uv_trend_web_analytics"]' '10791435'
+import_resource 'posthog_insight.intake_performance_overview_quality["intake_poor_inp_ratio"]' '10794623'
+import_resource 'posthog_insight.intake_performance_overview_quality["intake_poor_fcp_ratio"]' '10794622'
+import_resource 'posthog_insight.intake_performance_overview_quality["intake_poor_cls_ratio"]' '10794625'
+import_resource 'posthog_insight.intake_performance_overview_quality["intake_web_vitals_coverage"]' '10794624'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_inp_p90_web_analytics"]' '10794932'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_lcp_p90_web_analytics"]' '10794927'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_fcp_p90_web_analytics"]' '10794930'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_cls_p90_web_analytics"]' '10794931'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_inp_p99_web_analytics"]' '10794934'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_lcp_p99_web_analytics"]' '10794928'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_fcp_p99_web_analytics"]' '10794929'
+import_resource 'posthog_insight.intake_performance_overview_percentiles["intake_cls_p99_web_analytics"]' '10794933'
+import_resource 'posthog_insight.intake_performance_overview_percentile_status' '10795642'
+import_resource 'posthog_insight.intake_performance_diagnostics["intake_dimension_coverage"]' '10794610'
+import_resource 'posthog_insight.intake_performance_diagnostics["intake_tenant_performance"]' '10794612'
+import_resource 'posthog_insight.intake_performance_diagnostics["intake_org_performance"]' '10794613'
+import_resource 'posthog_insight.intake_performance_diagnostics["intake_domain_performance"]' '10794611'
+import_resource 'posthog_insight.intake_performance_diagnostics["intake_web_vitals_reports"]' '10795956'
 import_resource 'posthog_dashboard_layout.intake_performance' '1956103'
+import_resource 'posthog_dashboard_layout.intake_performance_diagnostics' '1961465'
 
 echo "Import completed. Review the result with: make plan-intake-performance"
