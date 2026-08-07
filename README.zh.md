@@ -2,7 +2,7 @@
 
 > [English](./README.md) | 中文
 
-本项目使用 PostHog 官方 Terraform Provider 管理多个 Dashboard。每个 Dashboard 都是独立的 Terraform 根模块，拥有独立 State 和专属 Make 命令，因此创建、更新或删除一个 Dashboard 不会影响其他 Dashboard。
+本项目使用 PostHog 官方 Terraform Provider 管理多个 Dashboard。每个 Dashboard 都是独立的 Terraform 根模块，并通过项目 Workspace 隔离不同 PostHog 项目的 State，因此一个 Dashboard 或项目的变更不会影响其他 Dashboard 或项目。
 
 ## 项目结构
 
@@ -33,6 +33,8 @@ terraform-posthog-dashboard/
 │   └── intake-performance.zh.md      # Intake Performance 中文指标与使用说明
 └── scripts/
     ├── import-intake-performance.sh  # 幂等导入既有 PostHog 资源
+    ├── migrate-local-state.sh        # 安全迁移旧版 State 到项目 Workspace
+    ├── read-posthog-project-id.sh    # 从共享 tfvars 读取 Project ID
     └── cleanup-posthog-dashboard-tiles.sh
                                       # apply 时删除过时 Overview 图块
 ```
@@ -60,7 +62,7 @@ Intake Error Dashboard 用于监控 `/intake` 页面上的前端异常，包括�
 
 - Terraform 1.10 或更高版本
 - POSIX 兼容 Shell、`curl` 和 `jq`；Intake Performance 清理步骤会在 `terraform apply` 期间调用它们
-- PostHog US Cloud 项目 `92499`
+- 一个或多个目标 PostHog Cloud 项目；Intake Performance 的固定导入映射仅适用于项目 `92499`
 - 具有目标项目访问权限的 PostHog Personal API Key
 - 前端事件包含 `$session_id`、`$pathname`、`$host`、`$device_type`、`$raw_user_agent` 和 `tenant_id`；Exception 事件还必须包含 `$exception_types` 和 `$exception_values`
 
@@ -80,9 +82,10 @@ PostHog Provider 不需要单独手动安装。请先初始化 Dashboard，让 T
 
 ```bash
 make init-intake-error
+make workspace-new-intake-error
 ```
 
-初始化成功后，再依次执行 `make plan-intake-error` 和 `make apply-intake-error`。
+首次为当前 PostHog 项目初始化时，创建项目 Workspace 后再依次执行 `make plan-intake-error` 和 `make apply-intake-error`。如果 Workspace 已存在，不要重复执行 `workspace-new`。
 
 ## 1. 配置共享 PostHog 参数
 
@@ -98,6 +101,8 @@ Dashboard 名称、标签和路径等非敏感配置保存在对应目录的 `da
 
 `posthog_api_key` 同时声明为 `sensitive` 和 `ephemeral`。Terraform 会隐藏命令输出中的值，并避免将变量值写入 Plan 和 State。
 
+Makefile 会从此文件读取 `posthog_project_id`，并让所有有 State 的命令自动使用 `project-<posthog_project_id>` Workspace。修改 Project ID 后，命令会切换到对应项目的 State；如果 Workspace 不存在则立即失败，不会复用 `default` 或其他项目的 State。
+
 如果 `terraform.tfvars` 不存在，可以从示例文件重新创建：
 
 ```bash
@@ -108,20 +113,22 @@ cp terraform.tfvars.example terraform.tfvars
 
 ### 从旧版单 Dashboard 目录升级
 
-如果当前检出环境的项目根目录中已存在 `terraform.tfstate`，拉取目录重构变更后先迁移 State：
+如果当前检出环境仍使用项目根目录或 Dashboard `default` 的 `terraform.tfstate`，拉取项目 Workspace 变更后先迁移 State：
 
 ```bash
 make migrate-intake-error
 make init-intake-error
+make workspace-show-intake-error
 make plan-intake-error
 ```
 
 迁移命令包含以下保护：
 
-- 目标 State 已存在且根目录 State 不存在时，按“已经迁移”成功退出。
-- 根目录和目标目录同时存在 State 时立即失败，不覆盖任何文件。
-- Terraform 正在持有 State Lock 时立即失败。
-- 同时迁移 `terraform.tfstate.backup`，但不会覆盖已有备份。
+- 可以从旧根目录 State 或 Dashboard 的 `default` State 迁移到 `terraform.tfstate.d/project-<ID>/`。
+- 根目录和 Dashboard `default` State 同时存在时立即失败，不自动选择来源。
+- 源 State 与项目 Workspace 目标 State 同时存在时立即失败，不覆盖任何文件。
+- Terraform 正在持有 State Lock 或目标备份已存在时立即失败。
+- 源备份存在时与 State 一起迁移。
 
 只有 Plan 显示 `No changes` 才能继续 Apply。如果旧 Dashboard 存在但找不到旧 State，不要执行 Apply；应先恢复 State、配置远程 Backend，或导入既有资源。
 
@@ -133,18 +140,22 @@ make plan-intake-error
 
 ```bash
 make init-intake-error
+make workspace-show-intake-error
 make fmt-check-intake-error
 make validate-intake-error
 make plan-intake-error
 make apply-intake-error
 ```
 
-`intake-performance` 管理既有 Overview Dashboard 和新的 Diagnostics Dashboard，共 31 个 Insight 和两个 Layout。第一次 Apply 前必须导入全部既有资源；完整 ID 映射和命令见 [Intake Performance 指标与使用说明](./docs/intake-performance.zh.md#8-导入既有资源)。在新环境中初始化本地 State：
+`intake-performance` 管理 Overview 与 Diagnostics Dashboard，共 31 个 Insight 和两个 Layout。对于项目 `92499`，第一次 Apply 前必须导入全部既有资源；完整 ID 映射和命令见 [Intake Performance 指标与使用说明](./docs/intake-performance.zh.md#8-导入既有资源)。在新环境中初始化该项目的本地 State：
 
 ```bash
 make init-intake-performance
+make workspace-new-intake-performance
 make import-intake-performance
 ```
+
+上述固定 ID 导入只适用于 PostHog 项目 `92499`。其他项目应创建独立 Workspace，并根据目标项目的实际资源决定导入或创建；导入脚本会拒绝在其他项目运行。
 
 导入完成后使用以下常规工作流：
 
@@ -162,6 +173,13 @@ make output-intake-error
 make state-list-intake-error
 make output-intake-performance
 make state-list-intake-performance
+```
+
+查看当前配置派生出的项目 Workspace 或列出全部 Workspace：
+
+```bash
+make workspace-show-intake-error
+make workspace-list-intake-error
 ```
 
 对于 Intake Performance，`dashboard.tfvars.json` 配置两个 Dashboard 名称、Overview 与 Diagnostics 的滚动时间范围、标签和 Intake 路径。`make output-intake-performance` 返回 Overview ID/URL、Diagnostics ID/URL，以及完整 Insight ID 映射。准确的输入、输出、清理行为和 Provider 限制见 [Intake Performance 管理范围](./docs/intake-performance.zh.md#7-terraform-管理范围)。
@@ -183,20 +201,20 @@ make apply DASHBOARD=intake-error
 
 - 根目录 `terraform.tfvars`：共享 PostHog 连接配置。
 - `dashboards/intake-error/dashboard.tfvars.json`：该 Dashboard 的业务配置。
-- `dashboards/intake-error/terraform.tfstate`：该 Dashboard 的独立本地 State。
+- `dashboards/intake-error/terraform.tfstate.d/project-<posthog_project_id>/terraform.tfstate`：该 Dashboard 和 PostHog 项目的独立本地 State。
 
 ## 3. 新增 Dashboard
 
 1. 在 `dashboards/<dashboard-name>/` 下创建独立根模块。
 2. 创建该 Dashboard 的 `dashboard.tfvars.json`。
 3. 在根目录 `Makefile` 的 `DASHBOARDS` 中登记名称。
-4. 依次执行 `make init-<dashboard-name>`、`make plan-<dashboard-name>` 和 `make apply-<dashboard-name>`。
+4. 依次执行 `make init-<dashboard-name>`、`make workspace-new-<dashboard-name>`、`make plan-<dashboard-name>` 和 `make apply-<dashboard-name>`。
 
 详细约束见 [dashboards/README.md](./dashboards/README.md)（[中文](./dashboards/README.zh.md)）。不要通过 `-target` 在一个 State 中分别创建 Dashboard，也不要复制其他 Dashboard 的 State。
 
 ## 安全说明
 
-- 根目录 `terraform.tfvars`、Terraform State 和 Plan 文件已加入 `.gitignore`。
+- 根目录 `terraform.tfvars`、项目 Workspace 下的 Terraform State 和 Plan 文件已加入 `.gitignore`。
 - `dashboard.tfvars.json` 只能包含非敏感业务配置。
 - `terraform.tfvars.example` 只能包含占位值，禁止加入真实 API Key。
 - Terraform State 可能包含资源信息；团队环境应使用加密的远程 Backend。
