@@ -4,9 +4,9 @@
 
 | 级别 | 告警名称 | 触发条件 | 检查周期 | 通知 |
 |---|---|---|---|---|
-| P0 | `[P0] Intake LCP critical (10m, n>=20)` | 最近10分钟 LCP 样本≥20，并且最近5分钟 LCP P95>15秒，或最近10分钟超过20%的 LCP>10秒 | 每小时 | Slack `#test-alert` |
-| Warning | `[Warning] Intake LCP P95 > 8s (10m, n>=20)` | 最近10分钟 LCP 样本≥20，并且 LCP P95>8秒 | 每小时 | Slack `#test-alert` |
-| Warning | `[Warning] Frontend error count >= 3 / 15m` | `/intake` 最近15分钟出现≥3个 `$exception` 事件 | 每小时 | Slack `#test-alert` |
+| P0 | `[P0] Intake LCP critical (10m, n>=20)` | 最近10分钟 LCP 样本≥20，并且最近5分钟 LCP P95>15秒，或最近10分钟超过20%的 LCP>10秒 | 每小时（prod调整为in real time） | Slack `#test-alert`(prod需调整channel) |
+| Warning | `[Warning] Intake LCP P95 > 8s (10m, n>=20)` | 最近10分钟 LCP 样本≥20，并且 LCP P95>8秒 | 每小时(prod调整为in real time) | Slack `#test-alert`(prod需调整channel) |
+| Warning | `[Warning] Frontend error count >= 3 / 15m` | `/intake` 最近15分钟出现≥3个 `$exception` 事件 | 每小时(prod调整为15min) | Slack `#test-alert` (prod需调整channel)|
 
 ### 数据口径
 
@@ -35,9 +35,3 @@
 | P0 | 10-minute samples ≥20 and either 5-minute LCP P95 >15s or >20% of 10-minute loads exceed 10s | Hourly | `#test-alert` |
 | Warning | 10-minute samples ≥20 and LCP P95 >8s | Hourly | `#test-alert` |
 | Warning | At least 3 `$exception` events on `/intake` within 15 minutes | Hourly | `#test-alert` |
-
-## 下一步建议
-
-1. 保持当前配置。
-2. 分别发送三次测试通知，验证 Slack。
-3. 启用15分钟调度，降低延迟和遗漏风险。
