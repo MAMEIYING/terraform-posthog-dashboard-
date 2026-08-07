@@ -25,9 +25,9 @@ When upgrading root-level or dashboard `default` State, first confirm that `terr
 
 Migration fails without overwriting files when root and dashboard `default` State both exist, source and target State both exist, a target backup already exists, or any State is locked. After migrating, run `make workspace-show-<dashboard-name>` and `make plan-<dashboard-name>`; existing resources must report `No changes`.
 
-## Add a dashboard
+## Add a stack
 
-1. Create an independent Terraform configuration under `dashboards/<dashboard-name>/`.
+1. Create an independent Terraform configuration under `dashboards/<stack-name>/`.
 2. Declare the shared variables `posthog_host`, `posthog_project_id`, and `posthog_api_key`.
 3. Store non-sensitive business settings in the directory's `dashboard.tfvars.json`.
 4. Register the name in `DASHBOARDS` in the root `Makefile`.

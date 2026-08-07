@@ -25,9 +25,9 @@ Workspace 不存在时，有 State 的命令会失败，而不是退回 `default
 
 根目录与 Dashboard `default` State 同时存在、源与目标 State 同时存在、目标备份已存在或任一 State 被锁定时，迁移会立即失败，不覆盖任何文件。迁移后执行 `make workspace-show-<dashboard-name>` 和 `make plan-<dashboard-name>`；已有资源必须显示 `No changes`。
 
-## 新增 Dashboard
+## 新增栈
 
-1. 在 `dashboards/<dashboard-name>/` 下创建独立 Terraform 配置。
+1. 在 `dashboards/<stack-name>/` 下创建独立 Terraform 配置。
 2. 声明共享变量 `posthog_host`、`posthog_project_id` 和 `posthog_api_key`。
 3. 将非敏感业务配置保存在该目录的 `dashboard.tfvars.json` 中。
 4. 在根目录 `Makefile` 的 `DASHBOARDS` 中登记名称。

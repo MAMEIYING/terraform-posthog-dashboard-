@@ -2,7 +2,7 @@
 
 > [English](./README.md) | 中文
 
-本项目使用 PostHog 官方 Terraform Provider 管理多个 Dashboard。每个 Dashboard 都是独立的 Terraform 根模块，并通过项目 Workspace 隔离不同 PostHog 项目的 State，因此一个 Dashboard 或项目的变更不会影响其他 Dashboard 或项目。
+本项目使用 PostHog 官方 Terraform Provider 管理多个 Dashboard 和告警资源。在官方 Provider 暴露 `HogQLAlertConfig` 前，HogQL Alert 使用 `Mastercard/restapi` 管理。每个栈都是独立 Terraform 根模块，并通过项目 Workspace 隔离不同 PostHog 项目的 State。
 
 ## 项目结构
 
@@ -14,6 +14,7 @@ terraform-posthog-dashboard/
 ├── dashboards/
 │   ├── README.md                     # 新增 Dashboard 英文说明
 │   ├── README.zh.md                  # 新增 Dashboard 中文说明
+│   ├── intake-alerts/                # Intake 告警独立根模块和 State
 │   ├── intake-error/                 # Intake Error 独立根模块和 State
 │   │   └── ...
 │   └── intake-performance/           # Intake Performance 独立根模块和 State
@@ -27,11 +28,14 @@ terraform-posthog-dashboard/
 │       ├── variables.tf
 │       └── versions.tf
 ├── docs/
+│   ├── alerts.md                     # Intake 告警英文配置与运维说明
+│   ├── alerts.zh.md                  # Intake 告警中文配置与运维说明
 │   ├── intake-error.md               # Intake Error 英文指标与使用说明
 │   ├── intake-error.zh.md            # Intake Error 中文指标与使用说明
 │   ├── intake-performance.md         # Intake Performance 英文指标与使用说明
 │   └── intake-performance.zh.md      # Intake Performance 中文指标与使用说明
 └── scripts/
+    ├── import-intake-alerts.sh       # 幂等导入既有告警资源
     ├── import-intake-performance.sh  # 幂等导入既有 PostHog 资源
     ├── migrate-local-state.sh        # 安全迁移旧版 State 到项目 Workspace
     ├── read-posthog-project-id.sh    # 从共享 tfvars 读取 Project ID
@@ -43,6 +47,7 @@ terraform-posthog-dashboard/
 
 | 命令名称 | PostHog Dashboard | 说明文档 |
 | --- | --- | --- |
+| `intake-alerts` | 3 个 HogQL Insight、3 个 Alert 和 6 个 Slack Destination | [English](./docs/alerts.md) / [中文](./docs/alerts.zh.md) |
 | `intake-error` | `Intake Frontend Error` | [English](./docs/intake-error.md) / [中文](./docs/intake-error.zh.md) |
 | `intake-performance` | `Intake Performance Overview` 和 `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [中文](./docs/intake-performance.zh.md) |
 
@@ -62,8 +67,8 @@ Intake Error Dashboard 用于监控 `/intake` 页面上的前端异常，包括�
 
 - Terraform 1.10 或更高版本
 - POSIX 兼容 Shell、`curl` 和 `jq`；Intake Performance 清理步骤会在 `terraform apply` 期间调用它们
-- 一个或多个目标 PostHog Cloud 项目；Intake Performance 的固定导入映射仅适用于项目 `92499`
-- 具有目标项目访问权限的 PostHog Personal API Key
+- 一个或多个目标 PostHog Cloud 项目；固定导入映射仅适用于文档注明的项目
+- 具有目标项目访问权限的 PostHog Personal API Key。Alert 栈在导入和 Plan 阶段需要 `insight:read`、`alert:read` 和 `hog_function:read`，Apply 前还需要对应的 Write Scope。
 - 前端事件包含 `$session_id`、`$pathname`、`$host`、`$device_type`、`$raw_user_agent` 和 `tenant_id`；Exception 事件还必须包含 `$exception_types` 和 `$exception_values`
 
 ### 在 macOS 上安装 Terraform
@@ -101,7 +106,7 @@ Dashboard 名称、标签和路径等非敏感配置保存在对应目录的 `da
 
 `posthog_api_key` 同时声明为 `sensitive` 和 `ephemeral`。Terraform 会隐藏命令输出中的值，并避免将变量值写入 Plan 和 State。
 
-Makefile 会从此文件读取 `posthog_project_id`，并让所有有 State 的命令自动使用 `project-<posthog_project_id>` Workspace。修改 Project ID 后，命令会切换到对应项目的 State；如果 Workspace 不存在则立即失败，不会复用 `default` 或其他项目的 State。
+Makefile 会从此文件读取 `posthog_project_id`，并让所有有 State 的命令使用 `project-<posthog_project_id>` Workspace。修改 Project ID 会切换到隔离的 State；如果 Workspace 不存在，命令会提示准确的 `workspace-new` 命令并停止，不会复用其他项目的 State。
 
 如果 `terraform.tfvars` 不存在，可以从示例文件重新创建：
 
@@ -113,7 +118,7 @@ cp terraform.tfvars.example terraform.tfvars
 
 ### 从旧版单 Dashboard 目录升级
 
-如果当前检出环境仍使用项目根目录或 Dashboard `default` 的 `terraform.tfstate`，拉取项目 Workspace 变更后先迁移 State：
+如果当前检出环境仍使用根目录或 Dashboard `default` State，应在修改 `posthog_project_id` 前，将其迁移到与 State 所属 PostHog 项目匹配的 Workspace：
 
 ```bash
 make migrate-intake-error
@@ -135,6 +140,21 @@ make plan-intake-error
 旧版根目录 `terraform.tfvars` 还可能包含 `dashboard_name`、`dashboard_tags`、`intake_path` 和 `tenant_property`。这些配置现在由 `dashboards/intake-error/dashboard.tfvars.json` 管理，应从根目录文件移除，只保留三个共享 PostHog 参数。
 
 ### 日常命令
+
+`intake-alerts` 使用独立 State，在 `terraform.tfvars` 的 `posthog_project_id` 所指定的 PostHog 项目中管理三个 HogQL Insight、三个 Alert 和六个 Slack Destination。全新部署时：
+
+```bash
+make init-intake-alerts
+make workspace-new-intake-alerts
+make fmt-check-intake-alerts
+make validate-intake-alerts
+make plan-intake-alerts
+make apply-intake-alerts
+```
+
+仅当 PostHog 资源已存在但需要恢复本地 State 时，才使用 `make import-intake-alerts`。
+
+准确资源映射、API Scope 和调度限制见 [Intake 告警](./docs/alerts.zh.md)。
 
 `intake-error` 的完整工作流为：
 
@@ -169,6 +189,8 @@ make apply-intake-performance
 查看 Output 和 State：
 
 ```bash
+make output-intake-alerts
+make state-list-intake-alerts
 make output-intake-error
 make state-list-intake-error
 make output-intake-performance
@@ -201,7 +223,7 @@ make apply DASHBOARD=intake-error
 
 - 根目录 `terraform.tfvars`：共享 PostHog 连接配置。
 - `dashboards/intake-error/dashboard.tfvars.json`：该 Dashboard 的业务配置。
-- `dashboards/intake-error/terraform.tfstate.d/project-<posthog_project_id>/terraform.tfstate`：该 Dashboard 和 PostHog 项目的独立本地 State。
+- `dashboards/intake-error/terraform.tfstate.d/project-<posthog_project_id>/terraform.tfstate`：该 Dashboard 和项目的独立本地 State。
 
 ## 3. 新增 Dashboard
 
@@ -214,7 +236,7 @@ make apply DASHBOARD=intake-error
 
 ## 安全说明
 
-- 根目录 `terraform.tfvars`、项目 Workspace 下的 Terraform State 和 Plan 文件已加入 `.gitignore`。
+- 根目录 `terraform.tfvars`、项目 Workspace State 和 Plan 文件已加入 `.gitignore`。
 - `dashboard.tfvars.json` 只能包含非敏感业务配置。
 - `terraform.tfvars.example` 只能包含占位值，禁止加入真实 API Key。
 - Terraform State 可能包含资源信息；团队环境应使用加密的远程 Backend。

@@ -2,7 +2,7 @@
 
 > English | [中文](./README.zh.md)
 
-This project uses the official PostHog Terraform Provider to manage multiple dashboards. Each dashboard is an independent Terraform root module, and project workspaces isolate State across PostHog projects, so changes to one dashboard or project do not affect another.
+This project uses the official PostHog Terraform Provider to manage multiple dashboards and alert resources. The HogQL alerts use `Mastercard/restapi` until the official Provider exposes `HogQLAlertConfig`. Each stack is an independent Terraform root module, and project Workspaces isolate State across PostHog projects.
 
 ## Project structure
 
@@ -14,6 +14,7 @@ terraform-posthog-dashboard/
 ├── dashboards/
 │   ├── README.md                     # Guide for adding dashboards
 │   ├── README.zh.md                  # Chinese guide for adding dashboards
+│   ├── intake-alerts/                # Independent Intake alert root module and state
 │   ├── intake-error/                 # Independent Intake Error root module and state
 │   │   └── ...
 │   └── intake-performance/           # Independent Intake Performance root module and state
@@ -27,11 +28,14 @@ terraform-posthog-dashboard/
 │       ├── variables.tf
 │       └── versions.tf
 ├── docs/
+│   ├── alerts.md                     # Intake alert configuration and operations
+│   ├── alerts.zh.md                  # Intake alert Chinese guide
 │   ├── intake-error.md               # Intake Error metrics and usage guide
 │   ├── intake-error.zh.md            # Intake Error Chinese guide
 │   ├── intake-performance.md         # Intake Performance metrics and usage guide
 │   └── intake-performance.zh.md      # Intake Performance Chinese guide
 └── scripts/
+    ├── import-intake-alerts.sh       # Idempotent import of existing alert resources
     ├── import-intake-performance.sh  # Idempotent import of existing PostHog resources
     ├── migrate-local-state.sh        # Safely migrates legacy State into a project workspace
     ├── read-posthog-project-id.sh    # Reads the Project ID from shared tfvars
@@ -43,6 +47,7 @@ terraform-posthog-dashboard/
 
 | Command name | PostHog dashboard | Documentation |
 | --- | --- | --- |
+| `intake-alerts` | 3 HogQL insights, 3 alerts, and 6 Slack destinations | [English](./docs/alerts.md) / [Chinese](./docs/alerts.zh.md) |
 | `intake-error` | `Intake Frontend Error` | [English](./docs/intake-error.md) / [Chinese](./docs/intake-error.zh.md) |
 | `intake-performance` | `Intake Performance Overview` and `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [Chinese](./docs/intake-performance.zh.md) |
 
@@ -62,8 +67,8 @@ For panel definitions, query semantics, data-quality findings, filter guidance, 
 
 - Terraform 1.10 or later
 - A POSIX-compatible shell, `curl`, and `jq`; the Intake Performance cleanup step invokes them during `terraform apply`
-- One or more target PostHog Cloud projects; the fixed Intake Performance import map is valid only for project `92499`
-- A PostHog Personal API Key with access to the target project
+- One or more target PostHog Cloud projects; fixed import maps apply only to their documented projects
+- A PostHog Personal API Key with access to the target project. The alert stack needs `insight:read`, `alert:read`, and `hog_function:read` for import and planning, plus the corresponding write scopes before applying changes.
 - Frontend events containing `$session_id`, `$pathname`, `$host`, `$device_type`, `$raw_user_agent`, and `tenant_id`; exception events must also contain `$exception_types` and `$exception_values`
 
 ### Install Terraform on macOS
@@ -101,7 +106,7 @@ Store non-sensitive settings such as dashboard names, tags, and paths in the cor
 
 `posthog_api_key` is declared as both `sensitive` and `ephemeral`. Terraform hides the value from command output and avoids persisting it in plans and state.
 
-The Makefile reads `posthog_project_id` from this file and makes every stateful command use the `project-<posthog_project_id>` workspace. Changing the Project ID selects that project's State. If the workspace is missing, the command fails instead of reusing `default` or another project's State.
+The Makefile reads `posthog_project_id` from this file and makes every stateful command use the `project-<posthog_project_id>` Workspace. Changing the Project ID selects an isolated State. If that Workspace is missing, the command stops with the exact `workspace-new` command instead of reusing another project's State.
 
 If `terraform.tfvars` does not exist, recreate it from the example:
 
@@ -113,7 +118,7 @@ cp terraform.tfvars.example terraform.tfvars
 
 ### Upgrade from the legacy single-dashboard layout
 
-If the current checkout still uses root-level or dashboard `default` `terraform.tfstate`, migrate it after pulling the project-workspace changes:
+If the current checkout still uses root-level or dashboard `default` State, migrate it into the Workspace matching the State's PostHog project before changing `posthog_project_id`:
 
 ```bash
 make migrate-intake-error
@@ -135,6 +140,21 @@ The plan must report `No changes` before applying. If the legacy dashboard exist
 The legacy root `terraform.tfvars` may also contain `dashboard_name`, `dashboard_tags`, `intake_path`, and `tenant_property`. These settings are now managed by `dashboards/intake-error/dashboard.tfvars.json`; remove them from the root file and retain only the three shared PostHog settings.
 
 ### Daily commands
+
+`intake-alerts` manages three HogQL insights, three alerts, and six Slack destinations in the PostHog project selected by `posthog_project_id` in `terraform.tfvars`, with a dedicated state. For a new deployment:
+
+```bash
+make init-intake-alerts
+make workspace-new-intake-alerts
+make fmt-check-intake-alerts
+make validate-intake-alerts
+make plan-intake-alerts
+make apply-intake-alerts
+```
+
+Use `make import-intake-alerts` only when the PostHog resources already exist and local state must be recovered.
+
+See [Intake alerts](./docs/alerts.md) for the exact resource mapping, API scopes, and scheduling limitations.
 
 The complete `intake-error` workflow is:
 
@@ -169,6 +189,8 @@ make apply-intake-performance
 Inspect output and state with:
 
 ```bash
+make output-intake-alerts
+make state-list-intake-alerts
 make output-intake-error
 make state-list-intake-error
 make output-intake-performance
@@ -201,7 +223,11 @@ make apply DASHBOARD=intake-error
 
 - Root `terraform.tfvars`: shared PostHog connection settings.
 - `dashboards/intake-error/dashboard.tfvars.json`: business configuration for this dashboard.
+<<<<<<< HEAD
 - `dashboards/intake-error/terraform.tfstate.d/project-<posthog_project_id>/terraform.tfstate`: independent local State for this dashboard and PostHog project.
+=======
+- `dashboards/intake-error/terraform.tfstate.d/project-<posthog_project_id>/terraform.tfstate`: independent local State for this dashboard and project.
+>>>>>>> 036d567 (feat(terraform): manage intake alerts per project)
 
 ## 3. Add a dashboard
 
@@ -214,7 +240,11 @@ See [dashboards/README.md](./dashboards/README.md) ([Chinese](./dashboards/READM
 
 ## Security
 
+<<<<<<< HEAD
 - Root `terraform.tfvars`, project-workspace Terraform State, and plan files are excluded by `.gitignore`.
+=======
+- Root `terraform.tfvars`, project Workspace State, and plan files are excluded by `.gitignore`.
+>>>>>>> 036d567 (feat(terraform): manage intake alerts per project)
 - `dashboard.tfvars.json` may contain only non-sensitive business configuration.
 - `terraform.tfvars.example` may contain placeholders only; never add a real API key.
 - Terraform state may contain resource information. Use an encrypted remote backend in team environments.

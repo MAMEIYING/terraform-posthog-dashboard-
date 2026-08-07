@@ -1,5 +1,5 @@
 TERRAFORM ?= terraform
-DASHBOARDS := intake-error intake-performance
+DASHBOARDS := intake-alerts intake-error intake-performance
 DASHBOARD ?= intake-error
 DASHBOARD_ALIASES := init format fmt-check validate workspace-new workspace-show workspace-list plan apply destroy output state-list migrate
 
@@ -15,7 +15,7 @@ TF_VAR_ARGS := -var-file="$(COMMON_TFVARS)" -var-file="$(DASHBOARD_TFVARS)"
 
 .DEFAULT_GOAL := help
 
-.PHONY: help list check-dashboard check-tfvars check-project-id check-project-workspace init fmt fmt-check validate workspace-new workspace-show workspace-list plan apply destroy output state-list migrate-state import-intake-performance
+.PHONY: help list check-dashboard check-tfvars check-project-id check-project-workspace init fmt fmt-check validate workspace-new workspace-show workspace-list plan apply destroy output state-list migrate-state import-intake-alerts import-intake-performance
 
 help:
 	@echo "Available dashboards: $(DASHBOARDS)"
@@ -37,6 +37,7 @@ help:
 	@echo "  Create it once per dashboard with make workspace-new-<dashboard-name>."
 	@echo
 	@echo "Existing dashboard imports:"
+	@echo "  make import-intake-alerts"
 	@echo "  make import-intake-performance"
 
 list:
@@ -106,6 +107,10 @@ migrate-state: check-dashboard check-project-id
 import-intake-performance: check-project-id
 	@$(MAKE) check-project-workspace DASHBOARD=intake-performance
 	@sh scripts/import-intake-performance.sh "$(PROJECT_DIR)" "$(TERRAFORM)" "$(PROJECT_WORKSPACE)" "$(TFVARS_PROJECT_ID)"
+
+import-intake-alerts: check-project-id
+	@$(MAKE) check-project-workspace DASHBOARD=intake-alerts
+	@sh scripts/import-intake-alerts.sh "$(PROJECT_DIR)" "$(TERRAFORM)" "$(PROJECT_WORKSPACE)" "$(TFVARS_PROJECT_ID)"
 
 init-%:
 	@$(MAKE) init DASHBOARD=$*

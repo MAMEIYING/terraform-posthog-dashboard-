@@ -29,6 +29,21 @@ case "$workspace_name" in
         ;;
 esac
 
+case "$workspace_name" in
+    project-*) expected_project_id=${workspace_name#project-} ;;
+    *)
+        echo "Workspace name must use project-<posthog_project_id>: $workspace_name" >&2
+        exit 1
+        ;;
+esac
+
+case "$expected_project_id" in
+    "" | *[!0-9]*)
+        echo "Workspace project ID must contain digits only: $workspace_name" >&2
+        exit 1
+        ;;
+esac
+
 if [ ! -d "$dashboard_dir" ]; then
     echo "Dashboard directory does not exist: $dashboard_dir" >&2
     exit 1
@@ -74,6 +89,32 @@ if [ -z "$source_state" ]; then
     echo "  $root_state" >&2
     echo "  $default_state" >&2
     echo "For an existing Dashboard, restore or import its State before running apply." >&2
+    exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is required to verify the PostHog project recorded in State." >&2
+    exit 1
+fi
+
+state_project_ids=$(jq -r '[.resources[]?.instances[]?.attributes.project_id? // empty | tostring] | unique[]' "$source_state")
+
+if [ -z "$state_project_ids" ]; then
+    echo "Could not determine the PostHog project ID from source State; refusing to migrate it." >&2
+    echo "Source: $source_state" >&2
+    exit 1
+fi
+
+if [ "$(printf '%s\n' "$state_project_ids" | wc -l | tr -d ' ')" -ne 1 ]; then
+    echo "Source State contains resources from multiple PostHog projects; refusing to migrate it." >&2
+    printf 'Project IDs:\n%s\n' "$state_project_ids" >&2
+    exit 1
+fi
+
+if [ "$state_project_ids" != "$expected_project_id" ]; then
+    echo "Source State project does not match the target Workspace; refusing to migrate it." >&2
+    echo "State project: $state_project_ids" >&2
+    echo "Target workspace: $workspace_name" >&2
     exit 1
 fi
 
