@@ -111,7 +111,7 @@ The committed `dashboard.tfvars.json` provides these module-specific values:
 | `diagnostics_date_from` | `-7d` | Diagnostics rolling range |
 | `intake_path` | `/intake` | Cleaned-path target used by performance queries |
 
-Shared connection values remain in the ignored root `terraform.tfvars`: `posthog_host`, `posthog_project_id`, and the sensitive, ephemeral `posthog_api_key`.
+Shared connection values remain in the ignored root `terraform.tfvars`: `posthog_host`, `posthog_project_id`, and the sensitive, ephemeral `posthog_api_key`. Stateful Make commands automatically use the `project-<posthog_project_id>` workspace.
 
 ### 7.2 Outputs
 
@@ -125,14 +125,16 @@ Run `make output-intake-performance` to inspect:
 
 ## 8. Importing existing resources
 
-This module corresponds to two existing dashboards. In a new local environment, import existing resources before applying so Terraform does not create duplicates.
+The fixed import map for this module corresponds to two existing dashboards in PostHog project `92499`. In a new local environment for that project, create the project workspace and import existing resources before applying so Terraform does not create duplicates. The import script refuses to use these fixed IDs with another Project ID or a mismatched workspace.
 
 ```bash
 make init-intake-performance
+make workspace-new-intake-performance
+make workspace-show-intake-performance
 make import-intake-performance
 ```
 
-The import script imports two dashboards, 31 existing insights, and two dashboard layouts into one isolated state. Re-running it skips resources already under management. Existing insight IDs are:
+The import script imports two dashboards, 31 existing insights, and two dashboard layouts into the isolated `project-92499` State. Re-running it skips resources already under management. Existing insight IDs are:
 
 | Terraform key | PostHog Insight ID |
 | --- | ---: |

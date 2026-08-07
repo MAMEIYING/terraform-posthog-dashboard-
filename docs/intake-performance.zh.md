@@ -111,7 +111,7 @@ PostHog Provider `1.0.x` 无法通过把既有 Insight 的 `dashboard_ids` 更�
 | `diagnostics_date_from` | `-7d` | Diagnostics 滚动时间范围 |
 | `intake_path` | `/intake` | 性能查询使用的 cleaned-path 目标 |
 
-共享连接配置仍保存在被忽略的根目录 `terraform.tfvars` 中：`posthog_host`、`posthog_project_id` 以及声明为 Sensitive 和 Ephemeral 的 `posthog_api_key`。
+共享连接配置仍保存在被忽略的根目录 `terraform.tfvars` 中：`posthog_host`、`posthog_project_id` 以及声明为 Sensitive 和 Ephemeral 的 `posthog_api_key`。有 State 的 Make 命令会自动使用 `project-<posthog_project_id>` Workspace。
 
 ### 7.2 输出
 
@@ -125,14 +125,16 @@ PostHog Provider `1.0.x` 无法通过把既有 Insight 的 `dashboard_ids` 更�
 
 ## 8. 导入既有资源
 
-该目录对应两个已有 Dashboard，首次在一个新的本地环境中使用时必须先导入，禁止直接 `apply`，否则 Terraform 会尝试创建副本。
+该目录中的固定导入映射对应 PostHog 项目 `92499` 的两个已有 Dashboard。首次在一个新的本地环境中管理该项目时，必须先创建项目 Workspace 并导入，禁止直接 `apply`，否则 Terraform 会尝试创建副本。导入脚本会拒绝在其他 Project ID 或不匹配的 Workspace 中使用这些固定 ID。
 
 ```bash
 make init-intake-performance
+make workspace-new-intake-performance
+make workspace-show-intake-performance
 make import-intake-performance
 ```
 
-导入脚本会把 2 个 Dashboard、31 个既有 Insight 和 2 个 Dashboard Layout 导入到同一个独立 State；重复执行时会跳过已经纳管的资源。当前既有资源 ID 与 Terraform Key 的对应关系如下：
+导入脚本会把 2 个 Dashboard、31 个既有 Insight 和 2 个 Dashboard Layout 导入到 `project-92499` 的独立 State；重复执行时会跳过已经纳管的资源。当前既有资源 ID 与 Terraform Key 的对应关系如下：
 
 | Terraform Key | PostHog Insight ID |
 | --- | ---: |

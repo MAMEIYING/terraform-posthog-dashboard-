@@ -2,7 +2,7 @@
 
 > English | [中文](./README.zh.md)
 
-This project uses the official PostHog Terraform Provider to manage multiple dashboards. Each dashboard is an independent Terraform root module with its own state and dedicated Make commands, so creating, updating, or deleting one dashboard does not affect the others.
+This project uses the official PostHog Terraform Provider to manage multiple dashboards. Each dashboard is an independent Terraform root module, and project workspaces isolate State across PostHog projects, so changes to one dashboard or project do not affect another.
 
 ## Project structure
 
@@ -33,6 +33,8 @@ terraform-posthog-dashboard/
 │   └── intake-performance.zh.md      # Intake Performance Chinese guide
 └── scripts/
     ├── import-intake-performance.sh  # Idempotent import of existing PostHog resources
+    ├── migrate-local-state.sh        # Safely migrates legacy State into a project workspace
+    ├── read-posthog-project-id.sh    # Reads the Project ID from shared tfvars
     └── cleanup-posthog-dashboard-tiles.sh
                                       # Removes obsolete Overview tiles during apply
 ```
@@ -60,7 +62,7 @@ For panel definitions, query semantics, data-quality findings, filter guidance, 
 
 - Terraform 1.10 or later
 - A POSIX-compatible shell, `curl`, and `jq`; the Intake Performance cleanup step invokes them during `terraform apply`
-- PostHog US Cloud project `92499`
+- One or more target PostHog Cloud projects; the fixed Intake Performance import map is valid only for project `92499`
 - A PostHog Personal API Key with access to the target project
 - Frontend events containing `$session_id`, `$pathname`, `$host`, `$device_type`, `$raw_user_agent`, and `tenant_id`; exception events must also contain `$exception_types` and `$exception_values`
 
@@ -80,9 +82,10 @@ The PostHog Provider does not require a separate manual installation. Initialize
 
 ```bash
 make init-intake-error
+make workspace-new-intake-error
 ```
 
-After initialization succeeds, continue with `make plan-intake-error` and then `make apply-intake-error`.
+For the first initialization of a PostHog project, create its project workspace before running `make plan-intake-error` and `make apply-intake-error`. Do not run `workspace-new` again when the workspace already exists.
 
 ## 1. Configure shared PostHog settings
 
@@ -98,6 +101,8 @@ Store non-sensitive settings such as dashboard names, tags, and paths in the cor
 
 `posthog_api_key` is declared as both `sensitive` and `ephemeral`. Terraform hides the value from command output and avoids persisting it in plans and state.
 
+The Makefile reads `posthog_project_id` from this file and makes every stateful command use the `project-<posthog_project_id>` workspace. Changing the Project ID selects that project's State. If the workspace is missing, the command fails instead of reusing `default` or another project's State.
+
 If `terraform.tfvars` does not exist, recreate it from the example:
 
 ```bash
@@ -108,20 +113,22 @@ cp terraform.tfvars.example terraform.tfvars
 
 ### Upgrade from the legacy single-dashboard layout
 
-If the current checkout already has a root-level `terraform.tfstate`, migrate the state after pulling the directory restructuring changes:
+If the current checkout still uses root-level or dashboard `default` `terraform.tfstate`, migrate it after pulling the project-workspace changes:
 
 ```bash
 make migrate-intake-error
 make init-intake-error
+make workspace-show-intake-error
 make plan-intake-error
 ```
 
 The migration command includes these safeguards:
 
-- If the destination state exists and the root state does not, it exits successfully because migration is already complete.
-- If both the root and destination states exist, it fails immediately without overwriting either file.
-- If Terraform currently holds a state lock, it fails immediately.
-- It also migrates `terraform.tfstate.backup` without overwriting an existing backup.
+- It can migrate either legacy root State or dashboard `default` State into `terraform.tfstate.d/project-<ID>/`.
+- It fails instead of choosing automatically when root and dashboard `default` State both exist.
+- It fails without overwriting files when source State and the project-workspace target both exist.
+- It fails when Terraform holds a State lock or a target backup already exists.
+- It moves a source backup together with its State when present.
 
 The plan must report `No changes` before applying. If the legacy dashboard exists but its old state cannot be found, do not apply. Restore the state, configure a remote backend, or import the existing resources first.
 
@@ -133,18 +140,22 @@ The complete `intake-error` workflow is:
 
 ```bash
 make init-intake-error
+make workspace-show-intake-error
 make fmt-check-intake-error
 make validate-intake-error
 make plan-intake-error
 make apply-intake-error
 ```
 
-`intake-performance` manages the existing Overview dashboard and the new Diagnostics dashboard, with 31 insights and two layouts. Import all existing resources before the first apply. The complete ID mapping and commands are documented in [Intake Performance metrics and usage](./docs/intake-performance.md#8-importing-existing-resources). Bootstrap a new local state with:
+`intake-performance` manages the Overview and Diagnostics dashboards, with 31 insights and two layouts. For project `92499`, import all existing resources before the first apply. The complete ID mapping and commands are documented in [Intake Performance metrics and usage](./docs/intake-performance.md#8-importing-existing-resources). Bootstrap that project's local State with:
 
 ```bash
 make init-intake-performance
+make workspace-new-intake-performance
 make import-intake-performance
 ```
+
+This fixed-ID import is valid only for PostHog project `92499`. For another project, create an independent workspace and decide whether to import or create resources from that project's actual contents. The import script refuses to run for another project.
 
 After importing, use this regular workflow:
 
@@ -162,6 +173,13 @@ make output-intake-error
 make state-list-intake-error
 make output-intake-performance
 make state-list-intake-performance
+```
+
+Inspect the project workspace derived from the current configuration or list all workspaces:
+
+```bash
+make workspace-show-intake-error
+make workspace-list-intake-error
 ```
 
 For Intake Performance, `dashboard.tfvars.json` configures both dashboard names, the Overview and Diagnostics rolling ranges, tags, and the Intake path. `make output-intake-performance` returns the Overview ID/URL, Diagnostics ID/URL, and the complete Insight ID map. See the [Intake Performance management scope](./docs/intake-performance.md#7-terraform-management-scope) for the exact inputs, outputs, cleanup behavior, and provider limitations.
@@ -183,20 +201,20 @@ make apply DASHBOARD=intake-error
 
 - Root `terraform.tfvars`: shared PostHog connection settings.
 - `dashboards/intake-error/dashboard.tfvars.json`: business configuration for this dashboard.
-- `dashboards/intake-error/terraform.tfstate`: independent local state for this dashboard.
+- `dashboards/intake-error/terraform.tfstate.d/project-<posthog_project_id>/terraform.tfstate`: independent local State for this dashboard and PostHog project.
 
 ## 3. Add a dashboard
 
 1. Create an independent root module under `dashboards/<dashboard-name>/`.
 2. Create `dashboard.tfvars.json` for the dashboard.
 3. Register the name in `DASHBOARDS` in the root `Makefile`.
-4. Run `make init-<dashboard-name>`, `make plan-<dashboard-name>`, and `make apply-<dashboard-name>` in order.
+4. Run `make init-<dashboard-name>`, `make workspace-new-<dashboard-name>`, `make plan-<dashboard-name>`, and `make apply-<dashboard-name>` in order.
 
 See [dashboards/README.md](./dashboards/README.md) ([Chinese](./dashboards/README.zh.md)) for detailed constraints. Do not use `-target` to create dashboards separately in a shared state, and never copy another dashboard's state.
 
 ## Security
 
-- Root `terraform.tfvars`, Terraform state, and plan files are excluded by `.gitignore`.
+- Root `terraform.tfvars`, project-workspace Terraform State, and plan files are excluded by `.gitignore`.
 - `dashboard.tfvars.json` may contain only non-sensitive business configuration.
 - `terraform.tfvars.example` may contain placeholders only; never add a real API key.
 - Terraform state may contain resource information. Use an encrypted remote backend in team environments.

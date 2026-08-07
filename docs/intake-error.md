@@ -457,7 +457,7 @@ Do not add every property panel at once. Geographic fields, replay-debug fields,
 
 - Terraform manages the dashboard, all 11 insights, and the complete layout.
 - The dashboard uses the independent `dashboards/intake-error` root module and state. Commands for other dashboards do not modify these resources.
-- Run `make plan-intake-error` and `make apply-intake-error` from the project root; do not run `terraform apply` directly in the root.
+- Run `make plan-intake-error` and `make apply-intake-error` from the project root. These commands automatically bind `project-<posthog_project_id>` from `terraform.tfvars`; do not run `terraform apply` directly in the root.
 - `posthog_dashboard_layout` fully controls dashboard tiles.
 - Do not add tiles only in the PostHog UI if they must persist; the next Terraform apply may overwrite the layout.
 - The current top-level default date range, interval, and path filter are stored in the PostHog UI because the provider does not manage dashboard-level filter fields.

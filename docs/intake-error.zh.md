@@ -457,7 +457,7 @@ resolved: false
 
 - Dashboard、11 个 Insight 和完整布局由 Terraform 管理。
 - 该 Dashboard 使用 `dashboards/intake-error` 独立根模块和独立 State；其他 Dashboard 的命令不会修改这些资源。
-- 从项目根目录使用 `make plan-intake-error` 和 `make apply-intake-error`，不要直接在根目录执行 `terraform apply`。
+- 从项目根目录使用 `make plan-intake-error` 和 `make apply-intake-error`。这些命令会根据 `terraform.tfvars` 自动绑定 `project-<posthog_project_id>` Workspace；不要直接在根目录执行 `terraform apply`。
 - `posthog_dashboard_layout` 会完整接管 Dashboard 图块。
 - 不要仅在 PostHog UI 添加需要长期保留的图块；下一次 Terraform Apply 可能覆盖布局。
 - 当前顶部默认时间、粒度和 Path 筛选保存在 PostHog UI 中，因为当前 Provider 不管理 Dashboard 级筛选字段。

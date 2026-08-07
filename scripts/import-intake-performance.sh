@@ -2,16 +2,41 @@
 
 set -eu
 
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-    echo "Usage: $0 <project-root> [terraform-binary]" >&2
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <project-root> <terraform-binary> <workspace-name> <posthog-project-id>" >&2
     exit 2
 fi
 
 project_root=$1
-terraform_bin=${2:-terraform}
+terraform_bin=$2
+workspace_name=$3
+project_id=$4
+expected_project_id=92499
 dashboard_dir="$project_root/dashboards/intake-performance"
 common_tfvars="$project_root/terraform.tfvars"
 dashboard_tfvars="$dashboard_dir/dashboard.tfvars.json"
+project_id_reader="$project_root/scripts/read-posthog-project-id.sh"
+
+case "$project_id" in
+    "" | *[!0-9]*)
+        echo "Invalid PostHog project ID: $project_id" >&2
+        exit 1
+        ;;
+esac
+
+if [ "$workspace_name" != "project-$project_id" ]; then
+    echo "Workspace and PostHog project ID do not match." >&2
+    echo "Expected workspace: project-$project_id" >&2
+    echo "Received workspace: $workspace_name" >&2
+    exit 1
+fi
+
+if [ "$project_id" != "$expected_project_id" ]; then
+    echo "The hard-coded intake-performance import map is only valid for PostHog project $expected_project_id." >&2
+    echo "Current PostHog project: $project_id" >&2
+    echo "Do not import these resource IDs into another project." >&2
+    exit 1
+fi
 
 if [ ! -d "$dashboard_dir/.terraform" ]; then
     echo "Terraform is not initialized for intake-performance." >&2
@@ -28,6 +53,32 @@ if [ ! -f "$dashboard_tfvars" ]; then
     echo "Missing dashboard variables: $dashboard_tfvars" >&2
     exit 1
 fi
+
+if [ ! -f "$project_id_reader" ]; then
+    echo "Missing PostHog project ID reader: $project_id_reader" >&2
+    exit 1
+fi
+
+if ! configured_project_id=$(sh "$project_id_reader" "$common_tfvars"); then
+    echo "Unable to read posthog_project_id from $common_tfvars" >&2
+    exit 1
+fi
+
+if [ "$configured_project_id" != "$project_id" ]; then
+    echo "Configured PostHog project ID does not match the requested import project." >&2
+    echo "terraform.tfvars: $configured_project_id" >&2
+    echo "Requested: $project_id" >&2
+    exit 1
+fi
+
+if ! "$terraform_bin" -chdir="$dashboard_dir" workspace list |
+    awk -v wanted="$workspace_name" '{ sub(/^[* ]+/, "", $0); if ($0 == wanted) found = 1 } END { exit !found }'; then
+    echo "Terraform workspace does not exist: $workspace_name" >&2
+    echo "Create it before importing existing resources." >&2
+    exit 1
+fi
+
+export TF_WORKSPACE="$workspace_name"
 
 state_contains() {
     address=$1
