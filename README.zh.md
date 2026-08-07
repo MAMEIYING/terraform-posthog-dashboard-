@@ -80,6 +80,26 @@ PostHog 原生 Trends 的所有公式序列共用同一种数值格式，无法�
 - 具有目标项目访问权限的 PostHog Personal API Key
 - 前端事件包含 `$session_id`、`$pathname`、`$host`、`$device_type`、`$raw_user_agent` 和 `tenant_id`；Exception 事件还必须包含 `$exception_types` 和 `$exception_values`
 
+### 在 macOS 上安装 Terraform
+
+如果终端显示 `/bin/sh: terraform: command not found`，请先安装 Terraform，再执行任何 Dashboard 命令。推荐使用 HashiCorp 官方 Homebrew Tap 安装：
+
+```bash
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
+terraform version
+```
+
+确认 `terraform version` 显示 Terraform 1.10.0 或更高版本。如果无法使用 Homebrew，请从 [Terraform 官方安装页面](https://developer.hashicorp.com/terraform/install)下载对应的 macOS 二进制文件，并将其放入 `PATH` 包含的目录。
+
+PostHog Provider 不需要单独手动安装。请先初始化 Dashboard，让 Terraform 自动下载所需 Provider：
+
+```bash
+make init-intake-error
+```
+
+初始化成功后，再依次执行 `make plan-intake-error` 和 `make apply-intake-error`。
+
 ## 1. 配置共享 PostHog 参数
 
 根目录的 `terraform.tfvars` 只保存所有 Dashboard 共用的 PostHog 连接配置。该文件已被 `.gitignore` 排除：

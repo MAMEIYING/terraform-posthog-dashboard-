@@ -80,6 +80,26 @@ Trend insights retain PostHog property-filter controls. The error list supports 
 - A PostHog Personal API Key with access to the target project
 - Frontend events containing `$session_id`, `$pathname`, `$host`, `$device_type`, `$raw_user_agent`, and `tenant_id`; exception events must also contain `$exception_types` and `$exception_values`
 
+### Install Terraform on macOS
+
+If the terminal reports `/bin/sh: terraform: command not found`, install Terraform before running any dashboard commands. The recommended installation method is HashiCorp's official Homebrew tap:
+
+```bash
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
+terraform version
+```
+
+Confirm that `terraform version` reports Terraform 1.10.0 or later. If Homebrew is unavailable, download the appropriate macOS binary from the [official Terraform installation page](https://developer.hashicorp.com/terraform/install) and place it in a directory included in `PATH`.
+
+The PostHog Provider does not require a separate manual installation. Initialize the dashboard first so Terraform downloads the required provider automatically:
+
+```bash
+make init-intake-error
+```
+
+After initialization succeeds, continue with `make plan-intake-error` and then `make apply-intake-error`.
+
 ## 1. Configure shared PostHog settings
 
 The root `terraform.tfvars` stores only the PostHog connection settings shared by all dashboards. The file is excluded by `.gitignore`:
