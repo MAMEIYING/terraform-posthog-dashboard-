@@ -44,33 +44,17 @@ terraform-posthog-dashboard/
 | `intake-error` | `Intake Frontend Error` | [English](./docs/intake-error.md) / [中文](./docs/intake-error.zh.md) |
 | `intake-performance` | `Intake Performance Overview` 和 `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [中文](./docs/intake-performance.zh.md) |
 
-## Intake Error Dashboard 内容
+## Intake Error Dashboard
 
-所有指标默认查询最近一天，并且只统计 `$pathname` **精确等于** `/intake` 的事件。趋势图统一使用小时粒度。
+Intake Error Dashboard 用于监控 `/intake` 页面上的前端异常，包括错误数量、受影响会话比例、时间趋势、问题归因和最近事件详情。所有指标默认查询最近一天，精确匹配 `$pathname = "/intake"`，趋势图使用小时粒度。
 
-| 图块 | 定义 |
-| --- | --- |
-| Frontend error count | `$exception` 事件总数 |
-| Frontend error rate | 发生 `$exception` 的唯一 Intake 会话数 ÷ 访问 Intake 的唯一 `$pageview` 会话数 × 100% |
-| Frontend error trend | 按小时统计错误数量 |
-| Frontend error rate trend | 按小时统计受错误影响的 Intake 会话比例 |
-| Top error issues | 按 `$exception_issue_id` 拆分前 10 个错误问题趋势 |
-| Unhandled error trend | 按小时统计 `$exception_handled = false` 的错误数量 |
-| Errors by type | 按 `$exception_types` 拆分错误趋势 |
-| Errors by domain | 按 `$host` 拆分错误趋势 |
-| Errors by tenant | 按 `tenant_id` 拆分错误趋势 |
-| Errors by browser | 按 `$browser` 拆分前 10 个浏览器错误趋势 |
-| Frontend error list | 最近错误的时间、租户、Domain、异常级别、类型、消息、来源、URL、Issue ID、Session ID、浏览器、操作系统、设备、Replay 状态、Intake 表单版本和用户 ID |
+面板定义、查询语义、验证结果、筛选建议和 Terraform 管理边界详见[中文说明](./docs/intake-error.zh.md)或[英文说明](./docs/intake-error.md)。
 
-### 错误率分母验证与展示限制
+## Intake Performance Dashboards
 
-`Frontend error rate` 的分母来自 `/intake` `$pageview` 事件的 `unique_session` 聚合，而不是 Pageview 事件总数。2026-08-06 对最近七天数据的验证结果为：39 个 `$pageview` 事件、11 个 Pageview 唯一会话、0 个 `$exception` 事件、0 个 Exception 唯一会话，因此错误率为 `0 ÷ 11 = 0%`。这证明当前分母查询链路可用，但仍需持续监控 `$pageview` 上 `$session_id`、`$pathname`、`$host` 和 `tenant_id` 的属性覆盖率。
+两个 Intake Performance Dashboard 共同用于观察 `/intake` 页面性能。Overview 通过 Web Vitals P75 趋势、Poor ratio、指标覆盖率和 PV/UV 监控最近 24 小时的健康状况；Diagnostics 通过 P75/P90/P99 趋势、Tenant、Organization、Domain 维度明细和逐次 Web Vitals 上报排查最近七天的问题。
 
-PostHog 原生 Trends 的所有公式序列共用同一种数值格式，无法在保持错误率百分比格式的同时，把分子和分母按整数正确显示在 Hover 中；`BoldNumber` 卡片本身也没有可 Hover 的数据点。因此当前 Terraform 配置保留百分比可视化，不加入会显示错误单位的分子或分母序列。完整验证结论和后续方案见 [Intake Error 指标与使用说明](./docs/intake-error.zh.md#32-frontend-error-rate)。
-
-趋势 Insight 保留 PostHog 属性筛选入口。错误列表同时支持时间范围和属性筛选，可以追加 `tenant_id`、`$host`、`$exception_types` 等条件。
-
-> `posthog_dashboard_layout` 会完整接管 Dashboard 中的所有图块。不要在 PostHog UI 中手动添加需要长期保留、但未在 Terraform 中声明的图块。
+面板定义、查询语义、数据质量结论、筛选建议和 Terraform 管理边界详见[中文说明](./docs/intake-performance.zh.md)或[英文说明](./docs/intake-performance.md)。
 
 ## 前置条件
 

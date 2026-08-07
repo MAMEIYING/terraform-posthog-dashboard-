@@ -44,33 +44,17 @@ terraform-posthog-dashboard/
 | `intake-error` | `Intake Frontend Error` | [English](./docs/intake-error.md) / [Chinese](./docs/intake-error.zh.md) |
 | `intake-performance` | `Intake Performance Overview` and `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [Chinese](./docs/intake-performance.zh.md) |
 
-## Intake Error dashboard contents
+## Intake Error dashboard
 
-All metrics query the latest day by default and include only events whose `$pathname` is **exactly** `/intake`. Trend charts use hourly buckets.
+The Intake Error dashboard monitors frontend exceptions on `/intake`, including error volume, affected-session rate, time trends, issue attribution, and recent event details. Metrics query the latest day by default, match `$pathname` exactly to `/intake`, and use hourly buckets for trend charts.
 
-| Tile | Definition |
-| --- | --- |
-| Frontend error count | Total number of `$exception` events |
-| Frontend error rate | Unique Intake sessions with an `$exception` ÷ unique Intake `$pageview` sessions × 100% |
-| Frontend error trend | Hourly error count |
-| Frontend error rate trend | Hourly proportion of Intake sessions affected by errors |
-| Top error issues | Trends for the top 10 error issues split by `$exception_issue_id` |
-| Unhandled error trend | Hourly count where `$exception_handled = false` |
-| Errors by type | Error trends split by `$exception_types` |
-| Errors by domain | Error trends split by `$host` |
-| Errors by tenant | Error trends split by `tenant_id` |
-| Errors by browser | Error trends for the top 10 browsers split by `$browser` |
-| Frontend error list | Recent error time, tenant, domain, severity, type, message, source, URL, issue ID, session ID, browser, operating system, device, replay status, Intake form version, and user ID |
+For panel definitions, query semantics, validation results, filter guidance, and Terraform management boundaries, see the [English guide](./docs/intake-error.md) or [Chinese guide](./docs/intake-error.zh.md).
 
-### Error-rate denominator validation and display limitations
+## Intake Performance dashboards
 
-The denominator of `Frontend error rate` comes from the `unique_session` aggregation over `/intake` `$pageview` events, not the number of pageview events. Validation on 2026-08-06 over the latest seven days returned 39 `$pageview` events, 11 unique pageview sessions, 0 `$exception` events, and 0 unique exception sessions, resulting in `0 ÷ 11 = 0%`. This confirms that the current denominator query works, but the property coverage of `$session_id`, `$pathname`, `$host`, and `tenant_id` on `$pageview` must still be monitored continuously.
+The two Intake Performance dashboards provide complementary views of `/intake` performance. Overview monitors the latest 24 hours through Web Vitals P75 trends, poor ratios, metric coverage, and PV/UV; Diagnostics investigates the latest seven days through P75/P90/P99 trends, tenant, organization, and domain breakdowns, and event-level Web Vitals reports.
 
-All formula series in native PostHog Trends share one numeric format, so the numerator and denominator cannot be shown correctly as integers in the hover state while retaining percentage formatting for the error rate. A `BoldNumber` card also has no hoverable data point. The current Terraform configuration therefore retains the percentage visualization without adding numerator or denominator series that would display incorrect units. See the [Intake Error metrics and usage guide](./docs/intake-error.md#32-frontend-error-rate) for the complete validation results and follow-up options.
-
-Trend insights retain PostHog property-filter controls. The error list supports both date-range and property filters, allowing conditions such as `tenant_id`, `$host`, and `$exception_types` to be added.
-
-> `posthog_dashboard_layout` fully controls all tiles in the dashboard. Do not manually add tiles in the PostHog UI if they need to persist but are not declared in Terraform.
+For panel definitions, query semantics, data-quality findings, filter guidance, and Terraform management boundaries, see the [English guide](./docs/intake-performance.md) or [Chinese guide](./docs/intake-performance.zh.md).
 
 ## Prerequisites
 
