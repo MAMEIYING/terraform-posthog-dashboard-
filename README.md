@@ -41,7 +41,7 @@ terraform-posthog-dashboard/
 
 | Command name | PostHog dashboard | Documentation |
 | --- | --- | --- |
-| `intake-error` | `intake error` | [English](./docs/intake-error.md) / [Chinese](./docs/intake-error.zh.md) |
+| `intake-error` | `Intake Frontend Error` | [English](./docs/intake-error.md) / [Chinese](./docs/intake-error.zh.md) |
 | `intake-performance` | `Intake Performance Overview` and `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [Chinese](./docs/intake-performance.zh.md) |
 
 ## Intake Error dashboard contents
