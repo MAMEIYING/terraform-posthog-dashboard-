@@ -34,7 +34,7 @@ variable "posthog_api_key" {
 variable "dashboard_name" {
   description = "Name of the PostHog dashboard."
   type        = string
-  default     = "intake error"
+  default     = "Intake Frontend Error"
 }
 
 variable "dashboard_tags" {

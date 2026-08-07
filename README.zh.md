@@ -41,7 +41,7 @@ terraform-posthog-dashboard/
 
 | 命令名称 | PostHog Dashboard | 说明文档 |
 | --- | --- | --- |
-| `intake-error` | `intake error` | [English](./docs/intake-error.md) / [中文](./docs/intake-error.zh.md) |
+| `intake-error` | `Intake Frontend Error` | [English](./docs/intake-error.md) / [中文](./docs/intake-error.zh.md) |
 | `intake-performance` | `Intake Performance Overview` 和 `Intake Performance Diagnostics` | [English](./docs/intake-performance.md) / [中文](./docs/intake-performance.zh.md) |
 
 ## Intake Error Dashboard 内容

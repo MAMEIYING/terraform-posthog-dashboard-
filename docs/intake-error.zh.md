@@ -2,11 +2,11 @@
 
 > [English](./intake-error.md) | 中文
 
-> 最后更新：2026-08-06
+> 最后更新：2026-08-07
 >
 > PostHog 项目：`92499`
 >
-> Dashboard：[intake error](https://us.posthog.com/project/92499/dashboard/1956440)
+> Dashboard：[Intake Frontend Error](https://us.posthog.com/project/92499/dashboard/1956440)
 >
 > 主要使用者：开发人员
 
